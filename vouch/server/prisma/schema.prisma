@@ -25,7 +25,7 @@ enum EscrowStatus {
 
 model Escrow {
   id               String       @id @default(uuid())
-  escrowId         Int?         @map("escrow_id") // On-chain escrow ID
+  escrowId         String?      @map("escrow_id") // On-chain escrow pubkey
   sellerAddress    String       @map("seller_address")
   buyerAddress     String?      @map("buyer_address")
   buyerToken       String?      @map("buyer_token") // Session token for buyer verification

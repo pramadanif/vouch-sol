@@ -91,7 +91,7 @@ router.post('/create', async (req: Request, res: Response) => {
             console.log(`Escrow ${escrow.id} linked to on-chain tx: ${txHash}, escrowId: ${onChainEscrowId}`);
             await updateEscrowOnChain(escrow.id, {
                 txHash: txHash,
-                escrowId: onChainEscrowId ? parseInt(onChainEscrowId) : undefined
+                escrowId: onChainEscrowId || undefined
             });
         } else {
             // Legacy mode: backend creates on-chain (for testing fallback)

@@ -1,266 +1,485 @@
-import { ethers } from 'ethers';
+import * as anchor from '@coral-xyz/anchor';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddressSync } from '@solana/spl-token';
+import * as fs from 'fs';
+import path from 'path';
 
-// VouchEscrow ABI (minimal interface)
-const ESCROW_ABI = [
-    "function createEscrow(address seller, address token, uint256 amount, uint256 releaseTime) external returns (uint256 escrowId)",
-    "function markFunded(uint256 escrowId, address buyer) external",
-    "function markShipped(uint256 escrowId) external",
-    "function releaseFunds(uint256 escrowId) external",
-    "function refundEscrow(uint256 escrowId) external",
-    "function confirmDelivery(uint256 escrowId) external",
-    "function getEscrow(uint256 escrowId) external view returns (address seller, address buyer, address token, uint256 amount, uint256 releaseTime, bool funded, bool shipped, bool released, bool cancelled)",
-    "function getEscrowStatus(uint256 escrowId) external view returns (string memory status)",
-    "function escrowCounter() external view returns (uint256)",
-    "event EscrowCreated(uint256 indexed escrowId, address indexed seller, uint256 amount, uint256 releaseTime)",
-    "event EscrowFunded(uint256 indexed escrowId, address indexed buyer, address token, uint256 amount)",
-    "event EscrowShipped(uint256 indexed escrowId)",
-    "event EscrowDelivered(uint256 indexed escrowId)",
-    "event EscrowReleased(uint256 indexed escrowId, address indexed seller, uint256 amount)",
-    "event EscrowRefunded(uint256 indexed escrowId, address indexed buyer, uint256 amount)"
-];
-
-// ERC20 ABI (for USDC approval)
-const ERC20_ABI = [
-    "function approve(address spender, uint256 amount) external returns (bool)",
-    "function allowance(address owner, address spender) external view returns (uint256)",
-    "function balanceOf(address account) external view returns (uint256)"
-];
-
-class WalletManager {
-    private provider: ethers.JsonRpcProvider;
-    private wallet: ethers.Wallet;
-    private escrowContract: ethers.Contract;
-    private usdcContract: ethers.Contract;
-    private idrxContract: ethers.Contract;
-
-    constructor() {
-        const rpcUrl = process.env.LISK_RPC_URL || 'https://rpc.sepolia-api.lisk.com';
-        const privateKey = process.env.PRIVATE_KEY;
-        const escrowAddress = process.env.VOUCH_ESCROW_ADDRESS; // Updated env var name
-        const usdcAddress = process.env.USDC_ADDRESS; // Updated env var name
-        const idrxAddress = process.env.IDRX_ADDRESS; // New env var
-
-        if (!privateKey) {
-            throw new Error('PRIVATE_KEY not set');
+// Minimal IDL for internal use in the server
+const IDL: any = {
+    version: '0.1.0',
+    name: 'vouch_escrow',
+    instructions: [
+        {
+            name: 'initializeConfig',
+            accounts: [
+                { name: 'config', writable: true, isSigner: false },
+                { name: 'payer', writable: true, isSigner: true },
+                { name: 'systemProgram', writable: false, isSigner: false }
+            ],
+            args: [
+                { name: 'protocolWallet', type: 'pubkey' },
+                { name: 'feeBps', type: 'u16' }
+            ]
+        },
+        {
+            name: 'markFunded',
+            accounts: [
+                { name: 'protocolWallet', writable: true, isSigner: true },
+                { name: 'config', writable: false, isSigner: false },
+                { name: 'escrowState', writable: true, isSigner: false },
+                { name: 'protocolToken', writable: true, isSigner: false },
+                { name: 'tokenMint', writable: false, isSigner: false },
+                { name: 'vault', writable: true, isSigner: false },
+                { name: 'tokenProgram', writable: false, isSigner: false }
+            ],
+            args: [{ name: 'buyer', type: 'pubkey' }]
+        },
+        {
+            name: 'markShipped',
+            accounts: [
+                { name: 'caller', writable: true, isSigner: true },
+                { name: 'config', writable: false, isSigner: false },
+                { name: 'escrowState', writable: true, isSigner: false }
+            ],
+            args: []
+        },
+        {
+            name: 'confirmDelivery',
+            accounts: [
+                { name: 'buyer', writable: true, isSigner: true },
+                { name: 'config', writable: false, isSigner: false },
+                { name: 'escrowState', writable: true, isSigner: false },
+                { name: 'buyerToken', writable: true, isSigner: false },
+                { name: 'tokenMint', writable: false, isSigner: false },
+                { name: 'vault', writable: true, isSigner: false },
+                { name: 'vaultAuthority', writable: false, isSigner: false },
+                { name: 'sellerToken', writable: true, isSigner: false },
+                { name: 'protocolToken', writable: true, isSigner: false },
+                { name: 'sellerProfile', writable: true, isSigner: false },
+                { name: 'tokenProgram', writable: false, isSigner: false }
+            ],
+            args: []
+        },
+        {
+            name: 'releaseFunds',
+            accounts: [
+                { name: 'protocolWallet', writable: true, isSigner: true },
+                { name: 'config', writable: false, isSigner: false },
+                { name: 'escrowState', writable: true, isSigner: false },
+                { name: 'tokenMint', writable: false, isSigner: false },
+                { name: 'vault', writable: true, isSigner: false },
+                { name: 'vaultAuthority', writable: false, isSigner: false },
+                { name: 'sellerToken', writable: true, isSigner: false },
+                { name: 'protocolToken', writable: true, isSigner: false },
+                { name: 'sellerProfile', writable: true, isSigner: false },
+                { name: 'tokenProgram', writable: false, isSigner: false }
+            ],
+            args: []
+        },
+        {
+            name: 'addRating',
+            accounts: [
+                { name: 'buyer', writable: true, isSigner: true },
+                { name: 'escrowState', writable: true, isSigner: false },
+                { name: 'sellerProfile', writable: true, isSigner: false }
+            ],
+            args: [{ name: 'rating', type: 'u8' }]
+        },
+        {
+            name: 'updateConfig',
+            accounts: [
+                { name: 'config', writable: true, isSigner: false },
+                { name: 'protocolWallet', writable: false, isSigner: true }
+            ],
+            args: [
+                { name: 'protocolWallet', type: { option: 'pubkey' } },
+                { name: 'feeBps', type: { option: 'u16' } }
+            ]
+        },
+        {
+            name: 'closeEscrow',
+            accounts: [
+                { name: 'protocolWallet', writable: true, isSigner: true },
+                { name: 'config', writable: false, isSigner: false },
+                { name: 'escrowState', writable: true, isSigner: false },
+                { name: 'vault', writable: true, isSigner: false },
+                { name: 'vaultAuthority', writable: false, isSigner: false },
+                { name: 'sellerToken', writable: true, isSigner: false },
+                { name: 'protocolToken', writable: true, isSigner: false },
+                { name: 'tokenProgram', writable: false, isSigner: false }
+            ],
+            args: []
         }
-
-        this.provider = new ethers.JsonRpcProvider(rpcUrl);
-        this.wallet = new ethers.Wallet(privateKey, this.provider);
-
-        if (escrowAddress) {
-            this.escrowContract = new ethers.Contract(escrowAddress, ESCROW_ABI, this.wallet);
-        } else {
-            console.warn('VOUCH_ESCROW_ADDRESS not set - contract calls will fail');
-            this.escrowContract = null as any;
+    ],
+    accounts: [
+        {
+            name: 'config',
+            type: {
+                kind: 'struct',
+                fields: [
+                    { name: 'protocolWallet', type: 'pubkey' },
+                    { name: 'feeBps', type: 'u16' },
+                    { name: 'bump', type: 'u8' }
+                ]
+            }
+        },
+        {
+            name: 'escrowState',
+            type: {
+                kind: 'struct',
+                fields: [
+                    { name: 'seller', type: 'pubkey' },
+                    { name: 'buyer', type: { option: 'pubkey' } },
+                    { name: 'tokenMint', type: 'pubkey' },
+                    { name: 'amount', type: 'u64' },
+                    { name: 'releaseTime', type: 'i64' },
+                    { name: 'status', type: { defined: 'EscrowStatus' } },
+                    { name: 'vaultBump', type: 'u8' },
+                    { name: 'descriptionHash', type: { array: ['u8', 32] } }
+                ]
+            }
+        },
+        {
+            name: 'sellerProfile',
+            type: {
+                kind: 'struct',
+                fields: [
+                    { name: 'seller', type: 'pubkey' },
+                    { name: 'totalTransactions', type: 'u64' },
+                    { name: 'ratingSum', type: 'u64' },
+                    { name: 'ratingCount', type: 'u64' },
+                    { name: 'disputesWon', type: 'u64' },
+                    { name: 'verified', type: 'bool' },
+                    { name: 'bump', type: 'u8' }
+                ]
+            }
         }
-
-        if (usdcAddress) {
-            this.usdcContract = new ethers.Contract(usdcAddress, ERC20_ABI, this.wallet);
-        } else {
-            console.warn('USDC_ADDRESS not set - USDC calls will fail');
-            this.usdcContract = null as any;
+    ],
+    types: [
+        {
+            name: 'EscrowStatus',
+            type: {
+                kind: 'enum',
+                variants: [
+                    { name: 'WaitingPayment' },
+                    { name: 'Funded' },
+                    { name: 'Shipped' },
+                    { name: 'Released' },
+                    { name: 'Disputed' },
+                    { name: 'Refunded' }
+                ]
+            }
         }
+    ]
+};
 
-        if (idrxAddress) {
-            this.idrxContract = new ethers.Contract(idrxAddress, ERC20_ABI, this.wallet);
-        } else {
-            console.warn('IDRX_ADDRESS not set - IDRX calls will fail');
-            this.idrxContract = null as any;
-        }
+interface EscrowAccount {
+    seller: PublicKey;
+    buyer: PublicKey;
+    tokenMint: PublicKey;
+    amount: anchor.BN;
+    releaseTime: anchor.BN;
+    status: any;
+    vaultBump: number;
+    descriptionHash: number[];
+}
 
-        console.log(`Wallet initialized: ${this.wallet.address}`);
+function loadKeypair(): Keypair {
+    const keyPath = process.env.SOLANA_PAYER_KEYPATH || path.join(process.cwd(), 'id.json');
+    if (!fs.existsSync(keyPath)) {
+        const newKeypair = Keypair.generate();
+        fs.writeFileSync(keyPath, JSON.stringify(Array.from(newKeypair.secretKey)));
+        return newKeypair;
+    }
+    const secretKey = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
+    return Keypair.fromSecretKey(new Uint8Array(secretKey));
+}
+
+export class WalletManager {
+    private connection: Connection;
+    private keypair: Keypair;
+    private programId: PublicKey;
+    private provider: anchor.AnchorProvider;
+    private program: anchor.Program;
+    private usdcMint: PublicKey;
+    private idrxMint: PublicKey;
+
+    constructor(rpcUrl: string, programId: string, usdcMint: string, idrxMint: string) {
+        this.connection = new Connection(rpcUrl, 'confirmed');
+        this.keypair = loadKeypair();
+        this.programId = new PublicKey(programId);
+        this.usdcMint = new PublicKey(usdcMint);
+        this.idrxMint = new PublicKey(idrxMint);
+
+        this.provider = new anchor.AnchorProvider(
+            this.connection,
+            new anchor.Wallet(this.keypair),
+            { commitment: 'confirmed' }
+        );
+
+        this.program = new anchor.Program(IDL, this.programId, this.provider);
+
+        console.log(`Solana wallet initialized: ${this.keypair.publicKey.toBase58()}`);
     }
 
     get address(): string {
-        return this.wallet.address;
+        return this.keypair.publicKey.toBase58();
     }
 
     get usdcAddress(): string {
-        return this.usdcContract?.target as string;
+        return this.usdcMint.toBase58();
     }
 
     get idrxAddress(): string {
-        return this.idrxContract?.target as string;
+        return this.idrxMint.toBase58();
     }
 
-    /**
-     * Create an escrow on-chain
-     */
-    async createEscrow(
-        seller: string,
-        tokenAddress: string,
-        amount: string,
-        decimals: number,
-        releaseDuration: number
-    ): Promise<{
-        escrowId: number;
-        releaseTime: number;
-        txHash: string;
-    }> {
-        // Calculate release time
-        const releaseTime = Math.floor(Date.now() / 1000) + releaseDuration;
+    private configPda(): PublicKey {
+        const [config] = PublicKey.findProgramAddressSync([Buffer.from('config')], this.programId);
+        return config;
+    }
 
-        // Amount in smallest units
-        const amountWei = ethers.parseUnits(amount, decimals);
+    private sellerProfilePda(seller: PublicKey): PublicKey {
+        const [profile] = PublicKey.findProgramAddressSync(
+            [Buffer.from('seller-profile'), seller.toBuffer()],
+            this.programId
+        );
+        return profile;
+    }
 
-        console.log(`Creating escrow: seller=${seller}, token=${tokenAddress}, amount=${amount}, releaseTime=${releaseTime}`);
+    private vaultPda(escrow: PublicKey): PublicKey {
+        const [vault] = PublicKey.findProgramAddressSync(
+            [Buffer.from('vault'), escrow.toBuffer()],
+            this.programId
+        );
+        return vault;
+    }
 
-        // Call createEscrow on contract
-        const tx = await this.escrowContract.createEscrow(seller, tokenAddress, amountWei, releaseTime);
-        const receipt = await tx.wait();
+    private vaultAuthorityPda(escrow: PublicKey): PublicKey {
+        const [vaultAuthority] = PublicKey.findProgramAddressSync(
+            [Buffer.from('vault-authority'), escrow.toBuffer()],
+            this.programId
+        );
+        return vaultAuthority;
+    }
 
-        // Parse event to get escrowId
-        const event = receipt.logs
-            .map((log: any) => {
-                try {
-                    return this.escrowContract.interface.parseLog(log);
-                } catch {
-                    return null;
-                }
+    private async ensureConfig(): Promise<void> {
+        const config = this.configPda();
+        const info = await this.connection.getAccountInfo(config);
+        if (info) return;
+
+        const feeBps = Number(process.env.SOLANA_FEE_BPS || '100');
+        await this.program.methods
+            .initializeConfig(this.keypair.publicKey, feeBps)
+            .accounts({
+                config,
+                payer: this.keypair.publicKey,
+                systemProgram: anchor.web3.SystemProgram.programId
             })
-            .find((e: any) => e?.name === 'EscrowCreated');
-
-        const escrowId = Number(event?.args?.escrowId || 0);
-
-        console.log(`Escrow created: id=${escrowId}, tx=${receipt.hash}`);
-
-        return {
-            escrowId,
-            releaseTime,
-            txHash: receipt.hash
-        };
+            .rpc();
     }
 
-    /**
-     * Mark escrow as funded (called after Xendit payment success)
-     * Protocol wallet pays in the specified token (must approve first)
-     */
-    async markFunded(escrowId: number, tokenAddress: string, amountWei: string, buyerAddress?: string): Promise<string> {
-        const buyer = buyerAddress || ethers.ZeroAddress;
-
-        console.log(`Marking escrow ${escrowId} as funded, buyer=${buyer}`);
-
-        // Approve token transfer if needed (simplified: assume max approval done manually or adding auto-approve here)
-        // Ideally checking allowance:
-        const tokenContract = tokenAddress === this.usdcAddress ? this.usdcContract : this.idrxContract;
-        if (tokenContract) {
-            const allowance = await tokenContract.allowance(this.wallet.address, this.escrowContract.target);
-            if (allowance < BigInt(amountWei)) {
-                console.log(`Approving token ${tokenAddress}...`);
-                const txApprove = await tokenContract.approve(this.escrowContract.target, ethers.MaxUint256);
-                await txApprove.wait();
-            }
-        }
-
-        const tx = await this.escrowContract.markFunded(escrowId, buyer);
-        const receipt = await tx.wait();
-
-        return receipt.hash;
-    }
-
-    /**
-     * Mark escrow as shipped (Protocol wallet action)
-     */
-    async markShipped(escrowId: number): Promise<string> {
-        console.log(`Marking escrow ${escrowId} as shipped`);
-
-        const tx = await this.escrowContract.markShipped(escrowId);
-        const receipt = await tx.wait();
-
-        console.log(`Escrow ${escrowId} marked shipped, tx=${receipt.hash}`);
-
-        return receipt.hash;
-    }
-
-    /**
-     * Release funds to seller
-     */
-    async releaseFunds(escrowId: number): Promise<string> {
-        console.log(`Releasing funds for escrow ${escrowId}`);
-
-        const tx = await this.escrowContract.releaseFunds(escrowId);
-        const receipt = await tx.wait();
-
-        console.log(`Escrow ${escrowId} released, tx=${receipt.hash}`);
-
-        return receipt.hash;
-    }
-
-    /**
-     * Refund escrow to buyer (for dispute resolution or seller cancellation)
-     */
-    async refundEscrow(escrowId: number): Promise<string> {
-        console.log(`Refunding escrow ${escrowId} to buyer`);
-
-        const tx = await this.escrowContract.refundEscrow(escrowId);
-        const receipt = await tx.wait();
-
-        console.log(`Escrow ${escrowId} refunded, tx=${receipt.hash}`);
-
-        return receipt.hash;
-    }
-
-    /**
-     * Get escrow status from chain
-     */
-    async getEscrowStatus(escrowId: number): Promise<string> {
-        return await this.escrowContract.getEscrowStatus(escrowId);
-    }
-
-    /**
-     * Get escrow details from chain
-     */
-    async getEscrowDetails(escrowId: number): Promise<{
+    async getEscrowDetails(escrowId: string): Promise<{
         seller: string;
         buyer: string;
-        token: string;
-        amount: string; // Returns raw wei string, caller handles decimals
-        releaseTime: number;
-        funded: boolean;
-        shipped: boolean;
-        released: boolean;
-        cancelled: boolean;
+        tokenMint: string;
+        amount: string;
+        releaseAt: number;
+        status: string;
     }> {
-        const result = await this.escrowContract.getEscrow(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(new PublicKey(escrowId)) as EscrowAccount;
         return {
-            seller: result[0],
-            buyer: result[1],
-            token: result[2],
-            amount: result[3].toString(),
-            releaseTime: Number(result[4]),
-            funded: result[5],
-            shipped: result[6],
-            released: result[7],
-            cancelled: result[8]
+            seller: escrow.seller.toBase58(),
+            buyer: escrow.buyer ? escrow.buyer.toBase58() : '',
+            tokenMint: escrow.tokenMint.toBase58(),
+            amount: escrow.amount.toString(),
+            releaseAt: escrow.releaseTime.toNumber(),
+            status: Object.keys(escrow.status)[0]
         };
     }
 
-    /**
-     * Check wallet balance
-     */
-    async getBalance(): Promise<string> {
-        const balance = await this.provider.getBalance(this.wallet.address);
-        return ethers.formatEther(balance);
+    async markFunded(escrowId: string, buyer?: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as EscrowAccount;
+
+        const tokenMint = escrow.tokenMint;
+        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        const vault = this.vaultPda(escrowPubkey);
+
+        const tx = await this.program.methods
+            .markFunded(buyer ? new PublicKey(buyer) : PublicKey.default)
+            .accounts({
+                protocolWallet: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey,
+                protocolToken,
+                tokenMint,
+                vault,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+            })
+            .rpc();
+
+        return tx;
     }
 
-    /**
-     * Check USDC balance
-     */
-    async getUsdcBalance(): Promise<string> {
-        if (!this.usdcContract) return '0';
-        const balance = await this.usdcContract.balanceOf(this.wallet.address);
-        return ethers.formatUnits(balance, 6);
+    async markShipped(escrowId: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const tx = await this.program.methods
+            .markShipped()
+            .accounts({
+                caller: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    async confirmDelivery(escrowId: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as EscrowAccount;
+
+        const tokenMint = escrow.tokenMint;
+        const vault = this.vaultPda(escrowPubkey);
+        const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
+        const buyerToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey); // Server acts as buyer if protocol mediated
+        const sellerToken = getAssociatedTokenAddressSync(tokenMint, escrow.seller);
+        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        const sellerProfile = this.sellerProfilePda(escrow.seller);
+
+        const tx = await this.program.methods
+            .confirmDelivery()
+            .accounts({
+                buyer: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey,
+                buyerToken,
+                tokenMint,
+                vault,
+                vaultAuthority,
+                sellerToken,
+                protocolToken,
+                sellerProfile,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    async releaseFunds(escrowId: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as EscrowAccount;
+
+        const tokenMint = escrow.tokenMint;
+        const vault = this.vaultPda(escrowPubkey);
+        const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
+        const sellerToken = getAssociatedTokenAddressSync(tokenMint, escrow.seller);
+        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        const sellerProfile = this.sellerProfilePda(escrow.seller);
+
+        const tx = await this.program.methods
+            .releaseFunds()
+            .accounts({
+                protocolWallet: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey,
+                tokenMint,
+                vault,
+                vaultAuthority,
+                sellerToken,
+                protocolToken,
+                sellerProfile,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    async closeEscrow(escrowId: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as EscrowAccount;
+
+        const tokenMint = escrow.tokenMint;
+        const vault = this.vaultPda(escrowPubkey);
+        const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
+        const sellerToken = getAssociatedTokenAddressSync(tokenMint, escrow.seller);
+        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+
+        const tx = await this.program.methods
+            .closeEscrow()
+            .accounts({
+                protocolWallet: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey,
+                vault,
+                vaultAuthority,
+                sellerToken,
+                protocolToken,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+            })
+            .rpc();
+
+        return tx;
+    }
+
+    async refundEscrow(escrowId: string): Promise<string> {
+        await this.ensureConfig();
+        const escrowPubkey = new PublicKey(escrowId);
+        const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as EscrowAccount;
+
+        const tokenMint = escrow.tokenMint;
+        const vault = this.vaultPda(escrowPubkey);
+        const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
+        const buyerToken = getAssociatedTokenAddressSync(tokenMint, escrow.buyer || this.keypair.publicKey);
+
+        const tx = await this.program.methods
+            .refundEscrow()
+            .accounts({
+                protocolWallet: this.keypair.publicKey,
+                config: this.configPda(),
+                escrowState: escrowPubkey,
+                tokenMint,
+                vault,
+                vaultAuthority,
+                buyerToken,
+                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+            })
+            .rpc();
+
+        return tx;
     }
 }
 
-// Singleton instance
-let walletManager: WalletManager | null = null;
+let walletManagerInstance: WalletManager | null = null;
 
 export function getWalletManager(): WalletManager {
-    if (!walletManager) {
-        walletManager = new WalletManager();
+    if (!walletManagerInstance) {
+        const rpcUrl = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
+        const programId = process.env.SOLANA_PROGRAM_ID || '11111111111111111111111111111111';
+        const usdcMint = process.env.SOLANA_USDC_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe';
+        const idrxMint = process.env.SOLANA_IDRX_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe';
+        walletManagerInstance = new WalletManager(rpcUrl, programId, usdcMint, idrxMint);
     }
-    return walletManager;
+    return walletManagerInstance;
 }
 
-export default WalletManager;
+let walletManagerInstance: WalletManager | null = null;
+
+export function getWalletManager(): WalletManager {
+    if (!walletManagerInstance) {
+        const rpcUrl = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
+        const programId = process.env.SOLANA_PROGRAM_ID || '11111111111111111111111111111111';
+        const usdcMint = process.env.SOLANA_USDC_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe';
+        const idrxMint = process.env.SOLANA_IDRX_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe';
+        walletManagerInstance = new WalletManager(rpcUrl, programId, usdcMint, idrxMint);
+    }
+    return walletManagerInstance;
+}

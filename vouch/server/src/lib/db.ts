@@ -61,7 +61,7 @@ export async function getEscrowsBySeller(sellerAddress: string): Promise<Escrow[
 
 // Update escrow with on-chain data (partial update supported)
 export async function updateEscrowOnChain(id: string, data: {
-  escrowId?: number;
+  escrowId?: string;
   releaseTime?: number;
   txHash?: string;
 }): Promise<void> {

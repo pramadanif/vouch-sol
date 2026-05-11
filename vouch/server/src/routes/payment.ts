@@ -35,15 +35,9 @@ async function processPaymentSuccess(escrowId: string, invoiceId?: string) {
     if (escrow.escrowId !== null) {
         try {
             const wallet = getWalletManager();
-            const details = await wallet.getEscrowDetails(escrow.escrowId);
+            await wallet.markFunded(escrow.escrowId);
 
-            await wallet.markFunded(
-                escrow.escrowId,
-                details.token,
-                details.amount
-            );
-
-            console.log(`Escrow ${escrow.id} marked funded on-chain (token: ${details.token})`);
+            console.log(`Escrow ${escrow.id} marked funded on-chain`);
         } catch (err: any) {
             console.warn(`On-chain markFunded failed: ${err.message}`);
         }
@@ -74,32 +68,8 @@ router.post('/check-status', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'No invoice created yet' });
         }
 
-        // We need the invoice ID (external_id usually matches escrowId in our logic, or we query by external_id)
-        // Standard Xendit practice: we can query by external_id, but here let's assume we fetch the specific invoice if we stored the ID.
-        // Since we don't store Xendit Invoice ID separately (only URL), we might use external_id = escrow.id
-
         const xendit = getXenditClient();
-
-        // In our createInvoice (escrow.ts), we set external_id = escrow.id
-        // But getInvoice requires the XENDIT INVOICE ID, not external_id.
-        // Wait, getting by external_id is safer if we don't have the ID.
-        // Does Xendit library support get by external_id?
-        // Checking xendit.ts - it only has getInvoice(invoiceId).
-
-        // CRITICAL: We need the XENDIT Invoice ID. 
-        // If we didn't save it, we can't call getInvoice(id).
-        // Let's check `escrow.ts` create-invoice to see if we save it?
-        // We only save `xenditInvoiceUrl`.
-
-        // WORKAROUND: In Xendit, invoice URL usually contains the ID?
-        // https://checkout.xendit.co/web/65a...
-        // The ID is the last part.
-
-        let invoiceId = '';
-        if (escrow.xenditInvoiceUrl) {
-            const parts = escrow.xenditInvoiceUrl.split('/');
-            invoiceId = parts[parts.length - 1]; // This might be a token, but usually works for ID lookups or we need actual ID.
-        }
+        const invoiceId = escrow.xenditInvoiceId || '';
 
         if (!invoiceId) {
             return res.status(400).json({ error: 'Could not determine invoice ID' });

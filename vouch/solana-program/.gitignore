@@ -1,0 +1,20 @@
+# Anchor build artifacts
+target/
+.anchor/
+
+# Local keys (NEVER commit these)
+id.json
+*-keypair.json
+
+# Local test ledger
+test-ledger/
+
+# Dependencies
+node_modules/
+
+# Local tools
+solana-release/
+solana-release.tar.bz2
+
+# Logs
+*.log

@@ -3,18 +3,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Wallet, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Copy, Plus, Package, X, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
+import SellerReputation from '@/components/SellerReputation';
 import { api, SellerEscrowsResponse } from '@/lib/api';
 
 export default function DashboardPage() {
-    const { address, isConnected } = useAccount();
-    const { connect, connectors, isPending } = useConnect();
-    const { disconnect } = useDisconnect();
+    const { publicKey, connected, connect, disconnect } = useWallet();
 
     const [escrows, setEscrows] = useState<SellerEscrowsResponse['escrows']>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState('');
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isMounted, setIsMounted] = useState(false);
@@ -42,7 +42,7 @@ export default function DashboardPage() {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/escrow/${selectedEscrowId}/refund`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reason: refundReason, sellerAddress: address })
+                body: JSON.stringify({ reason: refundReason, sellerAddress: publicKey?.toBase58() })
             });
 
             const data = await res.json();
@@ -66,37 +66,36 @@ export default function DashboardPage() {
 
 
     const fetchEscrows = useCallback(async () => {
-        if (!address) return;
+        if (!publicKey) return;
         setIsLoading(true);
         try {
-            const data = await api.getSellerEscrows(address);
+            const data = await api.getSellerEscrows(publicKey.toBase58());
             setEscrows(data.escrows);
         } catch (err: any) {
             setError(err.message);
         } finally {
             setIsLoading(false);
         }
-    }, [address]);
+    }, [publicKey]);
 
     useEffect(() => {
         setIsMounted(true);
-        if (isConnected && address) fetchEscrows();
-    }, [isConnected, address, fetchEscrows]);
+        if (connected && publicKey) fetchEscrows();
+    }, [connected, publicKey, fetchEscrows]);
 
     // Auto-refresh escrows every 5 seconds to catch status changes (e.g., when buyer confirms delivery)
     useEffect(() => {
-        if (!isConnected || !address) return;
+        if (!connected || !publicKey) return;
 
         const interval = setInterval(() => {
             fetchEscrows();
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [isConnected, address, fetchEscrows]);
+    }, [connected, publicKey, fetchEscrows]);
 
     const handleConnect = () => {
-        const injected = connectors.find(c => c.id === 'injected');
-        if (injected) connect({ connector: injected });
+        connect();
     };
 
     const currencyConfig: Record<string, { symbol: string; name: string; usdcRate: number; flag: string }> = {
@@ -250,7 +249,7 @@ export default function DashboardPage() {
 
     if (!isMounted) return null;
 
-    if (!isConnected) {
+    if (!connected) {
         return (
             <div className="min-h-screen relative overflow-hidden">
                 {/* Rich Background like MyBCA */}
@@ -309,7 +308,7 @@ export default function DashboardPage() {
                             onClick={() => disconnect()}
                             className="text-sm px-4 py-2 rounded-lg bg-white border border-brand-border/50 text-brand-secondary font-mono hover:bg-brand-surfaceHighlight transition-colors shadow-sm"
                         >
-                            {address ? formatAddress(address) : '...'}
+                            {publicKey ? formatAddress(publicKey.toBase58()) : '...'}
                         </button>
                     </div>
                 </div>
@@ -328,6 +327,13 @@ export default function DashboardPage() {
                             Refresh
                         </button>
                     </div>
+
+                    {/* Seller Reputation Card */}
+                    {publicKey && (
+                        <div className="mb-8">
+                            <SellerReputation sellerAddress={publicKey.toBase58()} />
+                        </div>
+                    )}
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-10">

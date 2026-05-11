@@ -4,14 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Loader2, Check, AlertCircle, RefreshCw, Wallet } from 'lucide-react';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
 
-const ALLOWED_ADMIN = '0xB4d186af4d691DE665a36BDA1104067e069a15F8';
+const ALLOWED_ADMIN = process.env.NEXT_PUBLIC_ADMIN_PUBKEY || '';
 
 export default function AdminPage() {
-    const { address, isConnected } = useAccount();
-    const { connect, connectors, isPending } = useConnect();
-    const { disconnect } = useDisconnect();
+    const { publicKey, connected, connect, disconnect } = useWallet();
 
     const [checkEscrowId, setCheckEscrowId] = useState('');
     const [statusData, setStatusData] = useState<any>(null);
@@ -23,8 +21,7 @@ export default function AdminPage() {
     useEffect(() => { setIsMounted(true); }, []);
 
     const handleConnect = () => {
-        const injected = connectors.find(c => c.id === 'injected');
-        if (injected) connect({ connector: injected });
+        connect();
     };
 
     const checkStatus = async () => {
@@ -73,9 +70,9 @@ export default function AdminPage() {
 
     if (!isMounted) return null;
 
-    const isAuthorized = isConnected && address && address.toLowerCase() === ALLOWED_ADMIN.toLowerCase();
+    const isAuthorized = connected && publicKey && publicKey.toBase58() === ALLOWED_ADMIN;
 
-    if (!isConnected) {
+    if (!connected) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
                 <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -84,8 +81,8 @@ export default function AdminPage() {
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Panel</h1>
                     <p className="text-gray-500 mb-8">Connect authorized wallet to access.</p>
-                    <Button onClick={handleConnect} variant="primary" size="lg" className="w-full" disabled={isPending}>
-                        {isPending ? <><Loader2 className="animate-spin mr-2" size={18} />Connecting...</> : 'Connect Wallet'}
+                    <Button onClick={handleConnect} variant="primary" size="lg" className="w-full">
+                        Connect Wallet
                     </Button>
                 </div>
             </div>
@@ -100,7 +97,7 @@ export default function AdminPage() {
                         <AlertCircle size={32} className="text-red-600" />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-                    <p className="text-gray-500 mb-6">Wallet {address?.slice(0, 6)}...{address?.slice(-4)} is not authorized.</p>
+                    <p className="text-gray-500 mb-6">Wallet {publicKey?.toBase58().slice(0, 6)}...{publicKey?.toBase58().slice(-4)} is not authorized.</p>
                     <div className="space-y-3">
                         <button onClick={() => disconnect()} className="text-brand-primary font-medium hover:underline">Disconnect</button>
                     </div>
@@ -118,7 +115,7 @@ export default function AdminPage() {
                         <h1 className="text-2xl font-bold text-gray-900">Vouch Admin Panel</h1>
                     </div>
                     <div className="flex items-center gap-4">
-                        <span className="text-sm font-mono bg-white px-3 py-1 rounded border border-gray-200">{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                        <span className="text-sm font-mono bg-white px-3 py-1 rounded border border-gray-200">{publicKey?.toBase58().slice(0, 6)}...{publicKey?.toBase58().slice(-4)}</span>
                         <button onClick={() => disconnect()} className="text-sm text-gray-500 hover:text-gray-900">Logout</button>
                     </div>
                 </div>

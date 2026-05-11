@@ -1,0 +1,14 @@
+{
+  "name": "vouch-sol-root",
+  "version": "1.0.0",
+  "description": "Vouch Solana Migration Root",
+  "scripts": {
+    "dev:frontend": "cd vouch && npm run dev",
+    "dev:server": "cd vouch/server && npm run dev",
+    "dev": "npm run dev:frontend & npm run dev:server",
+    "install:all": "npm install && cd vouch && npm install && cd server && npm install",
+    "build:program": "cd vouch/solana-program && anchor build",
+    "deploy:program": "cd vouch/solana-program && anchor deploy",
+    "initialize": "cd vouch/solana-program && anchor run initialize"
+  }
+}

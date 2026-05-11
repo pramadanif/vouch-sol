@@ -11,7 +11,7 @@ export interface CreateEscrowRequest {
     currency?: string;
     fiatCurrency?: 'IDR' | 'SGD' | 'MYR' | 'THB' | 'PHP' | 'VND';
     txHash?: string;  // On-chain tx hash for linking
-    onChainEscrowId?: string; // On-chain escrow ID from event logs
+    onChainEscrowId?: string; // On-chain escrow pubkey
 }
 
 export interface CreateEscrowResponse {
@@ -30,7 +30,7 @@ export interface CreateEscrowResponse {
 
 export interface EscrowDetails {
     id: string;
-    escrowId: number | null;
+    escrowId: string | null;
     sellerAddress: string;
     buyerAddress: string | null;  // Buyer wallet address (set after funding)
     itemName: string;

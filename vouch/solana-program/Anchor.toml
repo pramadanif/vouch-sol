@@ -1,0 +1,23 @@
+[toolchain]
+anchor_version = "0.29.0"
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+vouch_escrow = "DmPtoRqbLZwjwWeecH2uYnrr4xmyvHoabSkoSHS9Q6GG"
+
+[programs.devnet]
+vouch_escrow = "DmPtoRqbLZwjwWeecH2uYnrr4xmyvHoabSkoSHS9Q6GG"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "id.json"
+
+[scripts]
+test = "yarn anchor test"
+initialize = "npx ts-node scripts/initialize.ts"
