@@ -128,7 +128,7 @@ export default function PayLinkPage() {
             const tokenMint = getTokenMint();
             if (!tokenMint) throw new Error('Token mint not configured');
 
-            const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL);
+            const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL) as any;
             const escrowPubkey = new PublicKey(escrow.escrowId);
             const vault = getVaultPda(escrowPubkey);
             const buyerToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), publicKey);
@@ -174,13 +174,13 @@ export default function PayLinkPage() {
                 const tokenMint = getTokenMint();
                 if (!tokenMint) throw new Error('Token mint not configured');
 
-                const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL as any);
+                const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL as any) as any;
                 const escrowPubkey = new PublicKey(escrow.escrowId);
                 const vault = getVaultPda(escrowPubkey);
                 const vaultAuthority = getVaultAuthorityPda(escrowPubkey);
                 const config = getConfigPda();
 
-                const configAccount: any = await program.account.config.fetch(config);
+                const configAccount: any = await (program as any).account.config.fetch(config);
                 const protocolWallet = new PublicKey(configAccount.protocolWallet);
 
                 const sellerToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), new PublicKey(escrow.sellerAddress));

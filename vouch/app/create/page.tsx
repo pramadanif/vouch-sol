@@ -193,7 +193,7 @@ export default function CreateLinkPage() {
             }
 
             const releaseTime = Math.floor(Date.now() / 1000) + releaseDuration;
-            const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL);
+            const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL) as any;
 
             const sellerProfile = getSellerProfilePda(publicKey);
             try {

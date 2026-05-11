@@ -27,9 +27,9 @@ export default function SellerReputation({ sellerAddress }: { sellerAddress: str
                 
                 // Use a dummy wallet for fetching if not connected
                 const dummyWallet = { publicKey: sellerPubkey, signTransaction: async (tx: any) => tx };
-                const program = getProgram(dummyWallet as any, VOUCH_ESCROW_IDL);
+                const program = getProgram(dummyWallet as any, VOUCH_ESCROW_IDL) as any;
                 
-                const account = await program.account.sellerProfile.fetch(profilePda);
+                const account = await (program as any).account.sellerProfile.fetch(profilePda);
                 setProfile({
                     totalTransactions: account.totalTransactions.toNumber(),
                     ratingSum: account.ratingSum.toNumber(),

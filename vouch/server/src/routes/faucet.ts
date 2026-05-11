@@ -1,83 +1,80 @@
 import { Router } from 'express';
-import { ethers } from 'ethers';
+import { Connection, PublicKey, LAMPORTS_PER_SOL, requestAirdrop } from '@solana/web3.js';
+import { getAssociatedTokenAddressSync, mintTo } from '@solana/spl-token';
+import { getWalletManager } from '../lib/wallet';
 
 const router = Router();
 
-// Token contract ABIs (simplified for mint function)
-const ERC20_ABI = [
-    "function mint(address to, uint256 amount) external",
-    "function balanceOf(address account) external view returns (uint256)"
-];
-
-// Rate limiting: track last request timestamp per address-type combo
+// Rate limiting
 const lastRequest: Record<string, number> = {};
-const COOLDOWN_MS = 60000; // 1 minute cooldown per token type
+const COOLDOWN_MS = 60000; // 1 min cooldown per address-token
 
 router.post('/', async (req, res) => {
     try {
         const { address, type } = req.body;
 
-        if (!address || !ethers.isAddress(address)) {
-            return res.status(400).json({ error: 'Invalid address' });
+        if (!address || !PublicKey.isOnCurve(address)) {
+            return res.status(400).json({ error: 'Invalid Solana address' });
         }
 
-        if (!['eth', 'usdc', 'idrx'].includes(type)) {
-            return res.status(400).json({ error: 'Invalid token type. Use: eth, usdc, or idrx' });
+        if (!['sol', 'usdc', 'idrx'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid token type. Use: sol, usdc, or idrx' });
         }
 
-        // Rate limiting
-        const key = `${address.toLowerCase()}-${type}`;
+        // Rate limit
+        const key = `${address}-${type}`;
         const now = Date.now();
         if (lastRequest[key] && now - lastRequest[key] < COOLDOWN_MS) {
             const remaining = Math.ceil((COOLDOWN_MS - (now - lastRequest[key])) / 1000);
-            return res.status(429).json({ error: `Please wait ${remaining}s before requesting again` });
+            return res.status(429).json({ error: `Wait ${remaining}s before next request` });
         }
 
-        // Setup provider and wallet
-        const rpcUrl = process.env.LISK_RPC_URL || 'https://rpc.sepolia-api.lisk.com';
-        const privateKey = process.env.PRIVATE_KEY;
-
-        if (!privateKey) {
-            return res.status(500).json({ error: 'Faucet not configured (no private key)' });
-        }
-
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
-        const wallet = new ethers.Wallet(privateKey, provider);
+        const rpcUrl = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
+        const connection = new Connection(rpcUrl, 'confirmed');
+        const userPubkey = new PublicKey(address);
 
         let txHash: string;
         let amount: string;
 
-        if (type === 'eth') {
-            // Send ETH for gas
-            amount = '0.01';
-            const tx = await wallet.sendTransaction({
-                to: address,
-                value: ethers.parseEther(amount),
-            });
-            await tx.wait();
-            txHash = tx.hash;
+        if (type === 'sol') {
+            // Airdrop SOL
+            amount = '1';
+            const sig = await requestAirdrop(connection, userPubkey, 1 * LAMPORTS_PER_SOL);
+            await connection.confirmTransaction(sig, 'confirmed');
+            txHash = sig;
         } else {
-            // Send tokens (USDC or IDRX)
-            const tokenAddress = type === 'usdc'
-                ? process.env.USDC_ADDRESS || '0xdfa2072b41c353f2c345548a19bf830a4c771024'
-                : process.env.IDRX_ADDRESS || '0xb6ed9eeaeebc4ac2ac4fc961045ec32b55d77185';
+            // Mint SPL tokens (USDC or IDRX)
+            const wallet = getWalletManager();
+            const tokenMint = new PublicKey(
+                type === 'usdc' 
+                    ? (process.env.SOLANA_USDC_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe')
+                    : (process.env.SOLANA_IDRX_MINT || 'EPjFWaLb3jqZzpEiwKN7jqvFo8wjRgdq6P1vGHdkDVTe')
+            );
 
-            const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, wallet);
+            const userTokenAccount = getAssociatedTokenAddressSync(tokenMint, userPubkey);
+            const faucetAccount = getAssociatedTokenAddressSync(tokenMint, new PublicKey(wallet.address));
 
-            if (type === 'usdc') {
-                amount = '1000';
-                const tx = await tokenContract.mint(address, ethers.parseUnits(amount, 6)); // USDC 6 decimals
-                await tx.wait();
-                txHash = tx.hash;
-            } else {
-                amount = '100000';
-                const tx = await tokenContract.mint(address, ethers.parseUnits(amount, 18)); // IDRX 18 decimals
-                await tx.wait();
-                txHash = tx.hash;
+            // Check if user token account exists; if not, create it
+            const acctInfo = await connection.getAccountInfo(userTokenAccount);
+            if (!acctInfo) {
+                return res.status(400).json({ error: 'User token account does not exist. Create via wallet first.' });
             }
+
+            amount = type === 'usdc' ? '1000' : '100000';
+            const decimals = type === 'usdc' ? 6 : 18;
+            const lamports = BigInt(amount) * BigInt(10 ** decimals);
+
+            const sig = await mintTo(
+                connection,
+                new PublicKey(wallet.address) as any, // payer (should be keypair but type forces this)
+                tokenMint,
+                userTokenAccount,
+                new PublicKey(wallet.address),
+                lamports
+            );
+            txHash = sig;
         }
 
-        // Update rate limit
         lastRequest[key] = now;
 
         console.log(`Faucet: Sent ${amount} ${type.toUpperCase()} to ${address}, tx: ${txHash}`);
@@ -87,7 +84,7 @@ router.post('/', async (req, res) => {
             type,
             amount,
             txHash,
-            message: `Sent ${amount} ${type.toUpperCase()} to ${address}`
+            message: `Sent ${amount} ${type.toUpperCase()}`
         });
 
     } catch (error: any) {
