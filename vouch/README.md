@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Built%20on-Lisk-blue" alt="Lisk" />
+  <img src="https://img.shields.io/badge/Built%20on-Solana-purple" alt="Solana" />
   <img src="https://img.shields.io/badge/Framework-Next.js%2015-black" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Smart%20Contract-Solidity-purple" alt="Solidity" />
+  <img src="https://img.shields.io/badge/Smart%20Contract-Rust%20%2F%20Anchor-orange" alt="Rust/Anchor" />
   <img src="https://img.shields.io/badge/Payment-Xendit-green" alt="Xendit" />
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT" />
 </p>
@@ -62,7 +62,7 @@ Social commerce in Southeast Asia is booming, but trust remains the biggest obst
 
 ### The Solution
 
-Vouch creates a **shareable payment link** that holds funds in a **smart contract escrow** on Lisk:
+Vouch creates a **shareable payment link** that holds funds in a **smart contract escrow** on Solana:
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐
@@ -79,7 +79,7 @@ Vouch creates a **shareable payment link** that holds funds in a **smart contrac
 
 **Key Innovation:**
 - Buyers pay with familiar local payment methods (QRIS, bank transfer)
-- Sellers receive funds in their own Lisk wallet
+- Sellers receive funds in their own Solana wallet
 - Smart contract ensures neither party can cheat
 - No registration, no account creation, no marketplace fees
 
@@ -99,10 +99,10 @@ Vouch creates a **shareable payment link** that holds funds in a **smart contrac
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Decentralized Escrow** | Smart contract on Lisk holds funds trustlessly | ✅ Live |
+| **Decentralized Escrow** | Smart contract on Solana holds funds trustlessly | ✅ Live |
 | **Fiat Payments** | QRIS, Bank Transfer, E-wallets via Xendit | ✅ Live |
 | **Crypto Payments** | Direct USDC/IDRX funding on-chain | ✅ Live |
-| **Seller Wallet** | Seller signs with their own Lisk wallet | ✅ Live |
+| **Seller Wallet** | Seller signs with their own Solana wallet | ✅ Live |
 | **Buyer Anonymity** | No wallet needed for buyers (fiat flow) | ✅ Live |
 | **Auto-Release** | Timeout protection for sellers | ✅ Live |
 | **Dashboard** | Sellers can track all escrows | ✅ Live |
@@ -151,10 +151,10 @@ graph TB
         HotWallet["🔐 Protocol Wallet<br/>Funds Fiat Escrows"]
     end
 
-    subgraph Blockchain["⛓️ Lisk Sepolia Testnet"]
-        VouchEscrow["VouchEscrow.sol<br/>Main Logic"]
-        MockUSDC["MockUSDC.sol<br/>Test Stablecoin"]
-        MockIDRX["MockIDRX.sol<br/>IDR Stablecoin"]
+    subgraph Blockchain["⛓️ Solana Devnet"]
+        VouchEscrow["lib.rs / Anchor<br/>Main Logic"]
+        MockUSDC["SPL Token<br/>Test Stablecoin"]
+        MockIDRX["SPL Token<br/>IDR Stablecoin"]
     end
 
     subgraph External["🌐 External Services"]
@@ -212,7 +212,7 @@ graph TB
                             │ ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    DATA PERSISTENCE LAYER                     │
-│  PostgreSQL (Metadata) | Lisk Blockchain (Escrow State)     │
+│  PostgreSQL (Metadata) | Solana Blockchain (Escrow State)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -220,24 +220,24 @@ graph TB
 
 ## 📜 Smart Contracts
 
-### Deployed Addresses (Lisk Sepolia)
+### Deployed Addresses (Solana Devnet)
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| **VouchEscrow** | `0xb015d8Eb15B5E82E10aCF1606c60cFD64C4c7cB2` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xb015d8Eb15B5E82E10aCF1606c60cFD64C4c7cB2) |
-| **MockUSDC** | `0xB7c78ceCB25a1c40b3fa3382bAf3F34c9b5bdD66` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xB7c78ceCB25a1c40b3fa3382bAf3F34c9b5bdD66) |
-| **MockIDRX** | `0xDfef62cf7516508B865440E5819e5435e69adceb` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xDfef62cf7516508B865440E5819e5435e69adceb) |
+| **VouchProgram** | `5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W` | [View on Explorer](https://explorer.solana.com/address/5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W?cluster=devnet) |
+| **IDRX Mint** | `hBNyV8aQutBWyXdA42MXiAgwyQBom6GC8d9sBgkLKzG` | [View on Explorer](https://explorer.solana.com/address/hBNyV8aQutBWyXdA42MXiAgwyQBom6GC8d9sBgkLKzG?cluster=devnet) |
+| **USDC Mint** | `GRyeQzyBoYBNqUp86wWyAWxb3ACtDGQw6QjVgimwa3GP` | [View on Explorer](https://explorer.solana.com/address/GRyeQzyBoYBNqUp86wWyAWxb3ACtDGQw6QjVgimwa3GP?cluster=devnet) |
 
 ### Network Configuration
 
 | Property | Value |
 |----------|-------|
-| **Network Name** | Lisk Sepolia Testnet |
-| **Chain ID** | `4202` |
-| **RPC URL** | `https://rpc.sepolia-api.lisk.com` |
-| **Currency Symbol** | ETH |
-| **Block Explorer** | `https://sepolia-blockscout.lisk.com` |
-| **Faucet** | `https://sepolia-faucet.lisk.com` |
+| **Network Name** | Solana Devnet |
+| **Chain ID** | `103` |
+| **RPC URL** | `https://api.devnet.solana.com` |
+| **Currency Symbol** | SOL |
+| **Block Explorer** | `https://explorer.solana.com/?cluster=devnet` |
+| **Faucet** | `https://faucet.solana.com` |
 
 ### VouchEscrow.sol - State Machine
 

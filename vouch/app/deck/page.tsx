@@ -19,9 +19,9 @@ const Slide1 = () => (
             <span className="text-5xl font-bold text-slate-900">VOUCH</span>
         </div>
         <p className="text-2xl text-slate-600 mb-4">Decentralized Escrow for Social Commerce</p>
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full border border-blue-100 mb-12">
-            <img src="/lisk.png" alt="Lisk" className="w-6 h-6" />
-            <span className="text-sm font-semibold text-blue-700">Built on Lisk</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-full border border-purple-100 mb-12">
+            <img src="/solana-sol-logo.png" alt="Solana" className="w-6 h-6" />
+            <span className="text-sm font-semibold text-purple-700">Built on Solana</span>
         </div>
         <h1 className="text-6xl font-extrabold text-slate-900 text-center leading-tight mb-8">
             Marketplace-level trust —<br /><span className="text-blue-600">without the marketplace.</span>
@@ -165,7 +165,7 @@ const Slide7 = () => (
             {[
                 ["Seller", "Creates escrow & ships goods"],
                 ["Buyer", "Pays via crypto or fiat"],
-                ["Smart Contract (Lisk)", "Holds escrow logic & funds"],
+                ["Smart Contract (Solana)", "Holds escrow logic & funds"],
                 ["Backend", "Verifies fiat payment only"],
                 ["Xendit", "Fiat payment confirmation"]
             ].map(([actor, role], i) => (
@@ -210,7 +210,7 @@ const Slide9 = () => (
         <div className="grid grid-cols-2 gap-12 max-w-5xl">
             <div>
                 <h3 className="text-xl font-bold text-slate-700 mb-6">Steps</h3>
-                {["Connect Lisk wallet", "Set item, price, escrow time", "Sign transaction"].map((item, i) => (
+                {["Connect Solana wallet", "Set item, price, escrow time", "Sign transaction"].map((item, i) => (
                     <div key={i} className="flex items-center gap-4 mb-4 text-lg text-slate-700">
                         <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">{i + 1}</div>
                         {item}
@@ -237,7 +237,7 @@ const Slide10 = () => (
         <div className="grid grid-cols-2 gap-12 max-w-5xl">
             <div className="bg-blue-50 rounded-2xl p-8 border border-blue-100">
                 <h3 className="text-2xl font-bold text-blue-700 mb-6 flex items-center gap-2"><Wallet size={24} /> Crypto (On-chain)</h3>
-                {["USDC on Lisk", "Funds locked directly in escrow"].map((item, i) => (
+                {["USDC on Solana", "Funds locked directly in escrow"].map((item, i) => (
                     <div key={i} className="flex items-center gap-3 mb-4 text-lg text-slate-700">
                         <CheckCircle2 className="text-blue-500" size={20} />{item}
                     </div>
@@ -303,10 +303,10 @@ const Slide12 = () => (
     </SlideWrapper>
 );
 
-// SLIDE 13: Why Lisk
+// SLIDE 13: Why Solana
 const Slide13 = () => (
     <SlideWrapper>
-        <h2 className="text-5xl font-extrabold text-slate-900 mb-16">Why we built Vouch on Lisk</h2>
+        <h2 className="text-5xl font-extrabold text-slate-900 mb-16">Why we built Vouch on Solana</h2>
         <div className="grid grid-cols-2 gap-6 max-w-4xl">
             {[
                 { icon: Zap, text: "Low gas fees → usable for real sellers" },

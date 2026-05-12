@@ -17,7 +17,7 @@ const CTASection: React.FC = () => {
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-ice to-white">Add escrow to any chat sale.</span>
         </h2>
         <p className="text-xl text-brand-ice/80 mb-12 max-w-2xl mx-auto leading-relaxed font-light">
-          Vouch is decentralized escrow infrastructure for social commerce on Lisk.
+          Vouch is decentralized escrow infrastructure for social commerce on Solana.
           Turn a payment link into on-chain escrow — without becoming a marketplace.
         </p>
         

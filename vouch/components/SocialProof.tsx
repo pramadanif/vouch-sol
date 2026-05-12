@@ -62,8 +62,8 @@ const SocialProof = () => {
               <div className="h-16 flex items-center justify-center">
                 <div className="group relative px-6 py-3 rounded-xl transition-all duration-300">
                   <img
-                    src="/lisk.png"
-                    alt="Built with Lisk"
+                    src="/solana-sol-logo.png"
+                    alt="Built with Solana"
                     className="h-9 w-auto opacity-80 transition-all duration-300 group-hover:opacity-100 group-hover:scale-105"
                   />
                 </div>

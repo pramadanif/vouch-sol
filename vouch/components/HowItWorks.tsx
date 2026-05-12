@@ -38,7 +38,7 @@ const HowItWorks: React.FC = () => {
             Secured by <span className="text-brand-action">escrow.</span>
           </h2>
           <p className="text-lg text-brand-secondary font-light">
-            Vouch turns a simple payment link into an on-chain escrow contract on Lisk.
+            Vouch turns a simple payment link into an on-chain escrow contract on Solana.
           </p>
         </div>
 
@@ -47,13 +47,13 @@ const HowItWorks: React.FC = () => {
             step="1"
             icon={FileText}
             title="Create Link"
-            description="Seller sets item, price, and timeout. The seller signs escrow creation on Lisk, then shares the link in a DM."
+            description="Seller sets item, price, and timeout. The seller signs escrow creation on Solana, then shares the link in a DM."
           />
           <StepCard
             step="2"
             icon={Lock}
             title="Buyer Pays"
-            description="Buyer pays with USDC/IDRX on Lisk or via QRIS/Virtual Account. Fiat is verified off-chain, escrow rules stay on-chain."
+            description="Buyer pays with USDC/IDRX on Solana or via QRIS/Virtual Account. Fiat is verified off-chain, escrow rules stay on-chain."
           />
           <StepCard
             step="3"

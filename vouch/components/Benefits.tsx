@@ -69,7 +69,7 @@ const Benefits: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-brand-primary font-bold block">Non‑Custodial Escrow</span>
-                      <span className="text-sm text-brand-secondary">Funds are locked in a Lisk smart contract. No company can freeze or steal them.</span>
+                      <span className="text-sm text-brand-secondary">Funds are locked in a Solana smart contract. No company can freeze or steal them.</span>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
@@ -124,7 +124,7 @@ const Benefits: React.FC = () => {
               <FeatureRow
                 icon={Banknote}
                 title="Hybrid Fiat + Crypto"
-                desc="Pay with USDC/IDRX on Lisk, or pay with QRIS/Virtual Account via Xendit. One escrow flow, one set of on-chain rules."
+                desc="Pay with USDC/IDRX on Solana, or pay with QRIS/Virtual Account via Xendit. One escrow flow, one set of on-chain rules."
               />
               <FeatureRow
                 icon={Scale}

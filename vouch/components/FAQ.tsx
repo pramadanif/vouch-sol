@@ -52,7 +52,7 @@ const FAQ: React.FC = () => {
             />
             <FAQItem 
                 question="How can buyers pay?"
-                answer="Vouch supports crypto payments (USDC or IDRX on Lisk) and fiat payments (QRIS / Virtual Account via Xendit). Regardless of payment method, escrow logic stays on-chain."
+                answer="Vouch supports crypto payments (USDC or IDRX on Solana) and fiat payments (QRIS / Virtual Account via Xendit). Regardless of payment method, escrow logic stays on-chain."
             />
         </div>
       </div>

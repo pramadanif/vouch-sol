@@ -25,7 +25,7 @@ const Footer: React.FC = () => {
             </p>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-ice/30 border border-brand-ice/50">
               <div className="w-2 h-2 rounded-full bg-brand-action animate-pulse"></div>
-              <span className="text-xs font-bold text-brand-primary">Built on Lisk</span>
+              <span className="text-xs font-bold text-brand-primary">Built on Solana</span>
             </div>
           </div>
 
