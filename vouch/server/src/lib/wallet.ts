@@ -147,10 +147,18 @@ export class WalletManager {
         const escrow = await this.program.account.escrowState.fetch(escrowPubkey) as any;
 
         const tokenMint = escrow.tokenMint;
-        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        const { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+        
+        // Ensure protocol has an ATA to receive fees
+        const protocolAta = await getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.keypair,
+            tokenMint,
+            this.keypair.publicKey
+        );
+        const protocolToken = protocolAta.address;
+        
         const vault = this.vaultPda(escrowPubkey);
-
-        const { TOKEN_PROGRAM_ID } = require('@solana/spl-token');
         const tx = await this.program.methods
             .markFunded(buyer ? new PublicKey(buyer) : new PublicKey('11111111111111111111111111111111'))
             .accounts({
@@ -190,9 +198,31 @@ export class WalletManager {
         const tokenMint = escrow.tokenMint;
         const vault = this.vaultPda(escrowPubkey);
         const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
-        const buyerToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey); // Server acts as buyer if protocol mediated
-        const sellerToken = getAssociatedTokenAddressSync(tokenMint, escrow.seller);
-        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        
+        const { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+        
+        // Ensure seller has an ATA
+        const sellerAta = await getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.keypair,
+            tokenMint,
+            escrow.seller
+        );
+        const sellerToken = sellerAta.address;
+
+        // Ensure protocol has an ATA
+        const protocolAta = await getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.keypair,
+            tokenMint,
+            this.keypair.publicKey
+        );
+        const protocolToken = protocolAta.address;
+
+        // For mediated payments, the server wallet acts as the 'buyer' to sign confirmDelivery
+        // but it doesn't need its own ATA since funds go from vault to seller/protocol
+        const buyerToken = protocolToken; 
+
         const sellerProfile = this.sellerProfilePda(escrow.seller);
 
         const tx = await this.program.methods
@@ -208,7 +238,7 @@ export class WalletManager {
                 sellerToken,
                 protocolToken,
                 sellerProfile,
-                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+                tokenProgram: TOKEN_PROGRAM_ID
             })
             .rpc();
 
@@ -223,8 +253,27 @@ export class WalletManager {
         const tokenMint = escrow.tokenMint;
         const vault = this.vaultPda(escrowPubkey);
         const vaultAuthority = this.vaultAuthorityPda(escrowPubkey);
-        const sellerToken = getAssociatedTokenAddressSync(tokenMint, escrow.seller);
-        const protocolToken = getAssociatedTokenAddressSync(tokenMint, this.keypair.publicKey);
+        
+        const { getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } = require('@solana/spl-token');
+        
+        // Ensure seller has an ATA
+        const sellerAta = await getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.keypair,
+            tokenMint,
+            escrow.seller
+        );
+        const sellerToken = sellerAta.address;
+
+        // Ensure protocol has an ATA
+        const protocolAta = await getOrCreateAssociatedTokenAccount(
+            this.connection,
+            this.keypair,
+            tokenMint,
+            this.keypair.publicKey
+        );
+        const protocolToken = protocolAta.address;
+
         const sellerProfile = this.sellerProfilePda(escrow.seller);
 
         const tx = await this.program.methods
@@ -239,7 +288,7 @@ export class WalletManager {
                 sellerToken,
                 protocolToken,
                 sellerProfile,
-                tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID
+                tokenProgram: TOKEN_PROGRAM_ID
             })
             .rpc();
 

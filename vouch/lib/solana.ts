@@ -3,7 +3,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import type { WalletContextState } from '@solana/wallet-adapter-react';
 
 export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
-export const SOLANA_PROGRAM_ID = process.env.NEXT_PUBLIC_SOLANA_PROGRAM_ID || 'DmPtoRqbLZwjwWeecH2uYnrr4xmyvHoabSkoSHS9Q6GG';
+export const SOLANA_PROGRAM_ID = process.env.NEXT_PUBLIC_SOLANA_PROGRAM_ID || '5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W';
 
 export const PDA_SEEDS = {
     config: 'config',

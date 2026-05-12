@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
             }
 
             amount = type === 'usdc' ? '1000' : '100000';
-            const decimals = type === 'usdc' ? 6 : 18;
+            const decimals = 6;
             const lamports = BigInt(amount) * BigInt(10 ** decimals);
 
             try {

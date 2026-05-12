@@ -188,7 +188,7 @@ export default function CreateLinkPage() {
 
             const cryptoCurrency = fiatCurrency === 'IDR' ? 'IDRX' : 'USDC';
             const tokenMint = cryptoCurrency === 'IDRX' ? SOLANA_IDRX_MINT : SOLANA_USDC_MINT;
-            const tokenDecimals = cryptoCurrency === 'IDRX' ? 18 : 6;
+            const tokenDecimals = 6; // Both USDC and new IDRX use 6 decimals
 
             if (!tokenMint) throw new Error('Token mint not configured');
 
@@ -225,11 +225,15 @@ export default function CreateLinkPage() {
             const vault = getVaultPda(escrowPubkey);
             const vaultAuthority = getVaultAuthorityPda(escrowPubkey);
 
-            const amountBase = new BN(Math.floor(parseFloat(tokenAmount) * Math.pow(10, tokenDecimals)));
+            // Safe conversion to base amount (e.g. 10^18 for IDRX)
+            // Using string manipulation to avoid JS number precision limits (Number.MAX_SAFE_INTEGER)
+            const [intPart, fracPart = ''] = tokenAmount.split('.');
+            const paddedFrac = fracPart.padEnd(tokenDecimals, '0').slice(0, tokenDecimals);
+            const amountBase = new BN(intPart + paddedFrac);
             const descriptionHash = hashDescription(`${itemName}|${itemDescription}|${amountFiat}`);
 
             const txHash = await program.methods
-                .createEscrow(amountBase, new BN(releaseTime), Array.from(descriptionHash))
+                .createEscrow(amountBase, new BN(releaseTime), descriptionHash)
                 .accounts({
                     seller: publicKey,
                     escrowState: escrowPubkey,

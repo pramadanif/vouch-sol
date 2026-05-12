@@ -19,7 +19,8 @@ import {
     getProgram,
     getSellerProfilePda,
     getVaultAuthorityPda,
-    getVaultPda
+    getVaultPda,
+    connection
 } from '@/lib/solana';
 
 const BUYER_TOKEN_KEY = 'vouch_buyer_token_';
@@ -138,6 +139,12 @@ export default function PayLinkPage() {
             const escrowPubkey = new PublicKey(escrow.escrowId);
             const vault = getVaultPda(escrowPubkey);
             const buyerToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), publicKey);
+            // Check if buyer has the token account initialized
+            try {
+                await connection.getTokenAccountBalance(buyerToken);
+            } catch (err) {
+                throw new Error(`You don't have a ${escrow.currency} account. Please get some tokens from the Faucet first.`);
+            }
 
             const txHash = await program.methods
                 .fundEscrow()
