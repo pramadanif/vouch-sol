@@ -1,5 +1,4 @@
 {
-  "root": "vouch",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next"
+  "outputDirectory": "vouch/.next"
 }
