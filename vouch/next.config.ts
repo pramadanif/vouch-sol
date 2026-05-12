@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   env: {
@@ -11,6 +12,8 @@ const nextConfig: NextConfig = {
     '@solana/wallet-adapter-react',
     '@solana/wallet-adapter-react-ui',
     '@solana/wallet-adapter-base',
+    '@solana/web3.js',
+    '@coral-xyz/anchor',
     '@walletconnect/universal-provider',
     '@walletconnect/ethereum-provider',
     '@walletconnect/logger',
