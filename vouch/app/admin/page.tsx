@@ -5,11 +5,13 @@ import { Shield, Loader2, Check, AlertCircle, RefreshCw, Wallet } from 'lucide-r
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 const ALLOWED_ADMIN = process.env.NEXT_PUBLIC_ADMIN_PUBKEY || '';
 
 export default function AdminPage() {
     const { publicKey, connected, connect, disconnect } = useWallet();
+    const { setVisible } = useWalletModal();
 
     const [checkEscrowId, setCheckEscrowId] = useState('');
     const [statusData, setStatusData] = useState<any>(null);
@@ -20,8 +22,12 @@ export default function AdminPage() {
 
     useEffect(() => { setIsMounted(true); }, []);
 
-    const handleConnect = () => {
-        connect();
+    const handleConnect = async () => {
+        try {
+            await connect();
+        } catch (e) {
+            setVisible(true);
+        }
     };
 
     const checkStatus = async () => {

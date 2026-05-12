@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Wallet, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Copy, Plus, Package, X, UploadCloud } from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
 import SellerReputation from '@/components/SellerReputation';
@@ -11,6 +12,7 @@ import { api, SellerEscrowsResponse } from '@/lib/api';
 
 export default function DashboardPage() {
     const { publicKey, connected, connect, disconnect } = useWallet();
+    const { setVisible } = useWalletModal();
 
     const [escrows, setEscrows] = useState<SellerEscrowsResponse['escrows']>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -94,8 +96,12 @@ export default function DashboardPage() {
         return () => clearInterval(interval);
     }, [connected, publicKey, fetchEscrows]);
 
-    const handleConnect = () => {
-        connect();
+    const handleConnect = async () => {
+        try {
+            await connect();
+        } catch (e) {
+            setVisible(true);
+        }
     };
 
     const currencyConfig: Record<string, { symbol: string; name: string; usdcRate: number; flag: string }> = {

@@ -47,17 +47,16 @@ router.post('/create', async (req: Request, res: Response) => {
         // Default to USDC if not specified
         const selectedCurrency = currency === 'IDRX' ? 'IDRX' : 'USDC';
         const selectedFiatCurrency = fiatCurrency || 'IDR';
-        const wallet = getWalletManager();
         let tokenAddress: string;
         let tokenAmount: string;
         let tokenDecimals: number;
 
         if (selectedCurrency === 'IDRX') {
-            tokenAddress = wallet.idrxAddress;
+            tokenAddress = process.env.SOLANA_IDRX_MINT || '';
             tokenAmount = amountIdr.toString(); // 1 IDR = 1 IDRX (roughly)
             tokenDecimals = 18;
         } else {
-            tokenAddress = wallet.usdcAddress;
+            tokenAddress = process.env.SOLANA_USDC_MINT || '';
             // Calculate USDC based on the fiat currency rate
             const rate = CURRENCY_RATES[selectedFiatCurrency] || CURRENCY_RATES.IDR;
             tokenAmount = (parseFloat(amountIdr) / rate).toFixed(2);
@@ -68,8 +67,8 @@ router.post('/create', async (req: Request, res: Response) => {
         // amountIdr field stores the fiat amount in the selected currency (legacy naming)
         // amountUsdc is calculated based on the fiat currency rate
         const rate = CURRENCY_RATES[selectedFiatCurrency] || CURRENCY_RATES.IDR;
-        const amountUsdcApprox = selectedCurrency === 'USDC'
-            ? tokenAmount
+        const amountUsdcApprox = selectedCurrency === 'IDRX'
+            ? amountIdr.toString()
             : (parseFloat(amountIdr) / rate).toFixed(2);
 
         const escrow = await createEscrowRecord({

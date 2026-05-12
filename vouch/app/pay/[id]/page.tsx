@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Check, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Loader2, AlertCircle, Package } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { BN, web3 } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
@@ -45,6 +46,7 @@ export default function PayLinkPage() {
     const [buyerToken, setBuyerTokenState] = useState<string | null>(null);
 
     const { publicKey, connected, connect, signTransaction } = useWallet();
+    const { setVisible } = useWalletModal();
 
     const fetchEscrow = useCallback(async () => {
         try {
@@ -120,7 +122,11 @@ export default function PayLinkPage() {
         setError('');
         if (!escrow?.escrowId) return;
         if (!publicKey || !signTransaction) {
-            await connect();
+            try {
+                await connect();
+            } catch (e) {
+                setVisible(true);
+            }
             return;
         }
 
@@ -240,76 +246,133 @@ export default function PayLinkPage() {
     }
 
     return (
-        <div className="min-h-screen bg-brand-surfaceHighlight pt-24 pb-16">
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen relative pt-24 pb-16 bg-brand-surfaceHighlight overflow-hidden">
+            {/* Elegant Grid Background */}
+            <div className="absolute inset-0 bg-grid z-0 opacity-40"></div>
+            
+            {/* Abstract Blue Shapes to make it "ramai" */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full bg-brand-ice/60 blur-3xl -translate-y-1/3 translate-x-1/3 mix-blend-multiply animate-pulse-soft"></div>
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full bg-brand-action/10 blur-3xl translate-y-1/3 -translate-x-1/4 mix-blend-multiply animate-pulse-soft" style={{animationDelay: '2s'}}></div>
+            </div>
+
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                 <FadeIn>
-                    <div className="bg-white rounded-2xl shadow-2xl p-10">
-                        <h1 className="text-2xl font-bold text-brand-primary mb-2">Pay Securely</h1>
-                        <p className="text-brand-secondary mb-6">Escrow powered by Solana.</p>
+                    <div className="text-center mb-10">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-ice/30 border border-brand-ice mb-4 animate-fade-up">
+                            <span className="flex h-2 w-2 relative">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-action opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-action"></span>
+                            </span>
+                            <span className="text-[10px] sm:text-xs font-semibold text-brand-primary tracking-wide uppercase">Secure Payment Checkout</span>
+                        </div>
+                    </div>
+                </FadeIn>
+
+                <FadeIn>
+                    <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 sm:p-10 border border-white/50 ring-1 ring-black/5">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-brand-primary mb-2">Pay Securely</h1>
+                            <p className="text-brand-secondary font-light">Your funds are locked in an on-chain escrow.</p>
+                        </div>
 
                         {escrow && (
-                            <div className="mb-8">
+                            <div className="mb-10 bg-brand-surfaceHighlight rounded-2xl p-6 border border-brand-border shadow-inner">
+                                <div className="flex justify-between items-center mb-4 pb-4 border-b border-brand-border/50">
+                                    <div>
+                                        <h3 className="font-bold text-brand-primary text-lg">{escrow.itemName}</h3>
+                                        <p className="text-sm text-brand-secondary">{escrow.itemDescription || 'No description provided'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-bold text-brand-action">{escrow.fiatCurrency} {escrow.amountIdr}</p>
+                                        <p className="text-xs text-brand-secondary font-medium uppercase mt-1">{escrow.amountUsdc} {escrow.currency}</p>
+                                    </div>
+                                </div>
                                 <SellerReputation sellerAddress={escrow.sellerAddress} />
                             </div>
                         )}
 
                         {error && (
-                            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm mb-6">
-                                {error}
+                            <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl p-4 text-sm flex gap-3 items-start mb-8">
+                                <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                                <span>{error}</span>
                             </div>
                         )}
 
                         {status === 'pending' && (
-                            <div className="space-y-4">
-                                <div className="flex gap-2">
-                                    <Button variant={paymentMethod === 'fiat' ? 'primary' : 'outline'} size="sm" onClick={() => setPaymentMethod('fiat')}>
-                                        Pay with QRIS
+                            <div className="space-y-6">
+                                <div className="flex justify-center gap-3">
+                                    <Button 
+                                        variant={paymentMethod === 'fiat' ? 'primary' : 'outline'} 
+                                        size="md" 
+                                        onClick={() => setPaymentMethod('fiat')}
+                                        className={paymentMethod === 'fiat' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
+                                    >
+                                        Pay with QRIS / Fiat
                                     </Button>
-                                    <Button variant={paymentMethod === 'crypto' ? 'primary' : 'outline'} size="sm" onClick={() => setPaymentMethod('crypto')}>
+                                    <Button 
+                                        variant={paymentMethod === 'crypto' ? 'primary' : 'outline'} 
+                                        size="md" 
+                                        onClick={() => setPaymentMethod('crypto')}
+                                        className={paymentMethod === 'crypto' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
+                                    >
                                         Pay with Crypto
                                     </Button>
                                 </div>
 
-                                {paymentMethod === 'fiat' ? (
-                                    <>
-                                        <Button variant="primary" size="lg" onClick={handlePayFiat} className="w-full">
-                                            Pay Now
+                                <div className="pt-4 border-t border-brand-border/50">
+                                    {paymentMethod === 'fiat' ? (
+                                        <div className="space-y-4">
+                                            <Button variant="primary" size="lg" onClick={handlePayFiat} className="w-full shadow-lg shadow-brand-action/20 py-4 text-base">
+                                                Continue to Payment
+                                            </Button>
+                                            <Button variant="outline" size="lg" onClick={handleSimulatePayment} disabled={isSimulating} className="w-full bg-white text-brand-secondary py-4 text-base">
+                                                {isSimulating ? (
+                                                    <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Simulating...</span>
+                                                ) : 'Simulate Payment (Devnet)'}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button variant="primary" size="lg" onClick={handlePayCrypto} className="w-full shadow-lg shadow-brand-action/20 py-4 text-base">
+                                            Pay {escrow?.amountUsdc} {escrow?.currency} from Wallet
                                         </Button>
-                                        <Button variant="outline" size="lg" onClick={handleSimulatePayment} disabled={isSimulating} className="w-full">
-                                            {isSimulating ? 'Simulating...' : 'Simulate Payment'}
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <Button variant="primary" size="lg" onClick={handlePayCrypto} className="w-full">
-                                        Pay with Solana
-                                    </Button>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         {status === 'secured' && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-green-700">
-                                    <Check size={18} /> Payment secured.
+                            <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Check size={32} className="text-green-600" />
                                 </div>
-                                <p className="text-sm text-brand-secondary">Wait for seller to ship item. You can confirm receipt after shipping.</p>
+                                <h3 className="text-xl font-bold text-green-700 mb-2">Payment Secured</h3>
+                                <p className="text-brand-secondary font-light">Your funds are safely locked in escrow. Please wait for the seller to ship your item.</p>
                             </div>
                         )}
 
                         {status === 'shipped' && (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 text-blue-700">
-                                    <AlertCircle size={18} /> Item shipped. Confirm receipt to release funds.
+                            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                                    <Package size={32} className="text-blue-600" />
                                 </div>
-                                <Button variant="primary" size="lg" onClick={handleConfirmReceipt} disabled={isConfirming} className="w-full">
-                                    {isConfirming ? 'Confirming...' : 'Confirm Receipt'}
+                                <h3 className="text-xl font-bold text-brand-primary mb-2">Item Shipped!</h3>
+                                <p className="text-brand-secondary font-light mb-6">The seller has shipped the item. Once you receive it and verify its condition, click confirm below to release the funds.</p>
+                                <Button variant="primary" size="lg" onClick={handleConfirmReceipt} disabled={isConfirming} className="w-full shadow-lg shadow-brand-action/20 py-4 text-base">
+                                    {isConfirming ? (
+                                        <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Confirming on-chain...</span>
+                                    ) : 'Confirm Receipt & Release Funds'}
                                 </Button>
                             </div>
                         )}
 
                         {status === 'completed' && (
-                            <div className="flex items-center gap-2 text-green-700">
-                                <Check size={18} /> Payment completed.
+                            <div className="bg-brand-ice/20 border border-brand-action/20 rounded-2xl p-6 text-center">
+                                <div className="w-16 h-16 bg-brand-action rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-action/30">
+                                    <Check size={32} className="text-white" />
+                                </div>
+                                <h3 className="text-xl font-bold text-brand-primary mb-2">Transaction Completed</h3>
+                                <p className="text-brand-secondary font-light">Funds have been successfully released to the seller. Thank you for using Vouch!</p>
                             </div>
                         )}
                     </div>

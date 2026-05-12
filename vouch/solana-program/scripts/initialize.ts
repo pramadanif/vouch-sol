@@ -1,12 +1,16 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { VouchEscrow } from "../target/types/vouch_escrow";
+import { VOUCH_ESCROW_IDL } from "../../server/src/lib/idl";
 
 async function main() {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.VouchEscrow as Program<VouchEscrow>;
+  const program = new Program(
+      VOUCH_ESCROW_IDL as any,
+      new anchor.web3.PublicKey("5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W"),
+      provider
+  );
   
   const [config] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("config")],

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-declare_id!("DmPtoRqbLZwjwWeecH2uYnrr4xmyvHoabSkoSHS9Q6GG");
+declare_id!("5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W");
 
 const AUTO_RELEASE_DELAY: i64 = 14 * 24 * 60 * 60;
 const SHIPPING_DEADLINE: i64 = 30 * 24 * 60 * 60;
@@ -366,14 +366,14 @@ pub mod vouch_escrow {
     }
 }
 
-fn release_to_seller(
-    escrow: &mut Account<EscrowState>,
-    vault: &Account<TokenAccount>,
-    vault_authority: &UncheckedAccount,
-    seller_token: &Account<TokenAccount>,
-    protocol_token: &Account<TokenAccount>,
-    token_program: &Program<Token>,
-    config: &Account<Config>,
+fn release_to_seller<'info>(
+    escrow: &mut Account<'info, EscrowState>,
+    vault: &Account<'info, TokenAccount>,
+    vault_authority: &UncheckedAccount<'info>,
+    seller_token: &Account<'info, TokenAccount>,
+    protocol_token: &Account<'info, TokenAccount>,
+    token_program: &Program<'info, Token>,
+    config: &Account<'info, Config>,
     is_auto_release: bool,
 ) -> Result<()> {
     let fee = escrow
@@ -385,9 +385,10 @@ fn release_to_seller(
 
     let seller_amount = escrow.amount.checked_sub(fee).ok_or(EscrowError::MathOverflow)?;
 
+    let escrow_key = escrow.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
         b"vault-authority",
-        escrow.key().as_ref(),
+        escrow_key.as_ref(),
         &[escrow.vault_bump],
     ]];
 
@@ -429,16 +430,17 @@ fn release_to_seller(
     Ok(())
 }
 
-fn release_to_buyer(
-    escrow: &mut Account<EscrowState>,
-    vault: &Account<TokenAccount>,
-    vault_authority: &UncheckedAccount,
-    buyer_token: &Account<TokenAccount>,
-    token_program: &Program<Token>,
+fn release_to_buyer<'info>(
+    escrow: &mut Account<'info, EscrowState>,
+    vault: &Account<'info, TokenAccount>,
+    vault_authority: &UncheckedAccount<'info>,
+    buyer_token: &Account<'info, TokenAccount>,
+    token_program: &Program<'info, Token>,
 ) -> Result<()> {
+    let escrow_key = escrow.key();
     let signer_seeds: &[&[&[u8]]] = &[&[
         b"vault-authority",
-        escrow.key().as_ref(),
+        escrow_key.as_ref(),
         &[escrow.vault_bump],
     ]];
 

@@ -6,7 +6,7 @@ import { resolve } from 'path';
 config({ path: resolve(__dirname, '../../.env') });
 
 async function main() {
-    const escrowId = 2; // Target the problematic ID
+    const escrowId = "2"; // Target the problematic ID (needs to be a real pubkey for actual use)
     const wallet = getWalletManager();
     console.log(`Using Wallet: ${wallet.address}`);
     console.log(`Using Escrow Contract: ${process.env.ESCROW_CONTRACT_ADDRESS || process.env.VOUCH_ESCROW_ADDRESS}`);
@@ -15,20 +15,18 @@ async function main() {
     try {
         const details = await wallet.getEscrowDetails(escrowId);
         console.log('Escrow Details:', {
-            token: details.token,
+            tokenMint: details.tokenMint,
             amount: details.amount,
-            funded: details.funded
+            status: details.status
         });
 
-        if (details.funded) {
+        if (details.status === 'Funded' || details.status === 'Shipped' || details.status === 'Released') {
             console.log('Escrow already funded on-chain.');
             return;
         }
 
         console.log('Marking funded...');
-        // markFunded(escrowId, token, amount, buyer?)
-        // amount is needed for allowance check
-        const tx = await wallet.markFunded(escrowId, details.token, details.amount);
+        const tx = await wallet.markFunded(escrowId);
         console.log(`Marked funded! Tx: ${tx}`);
     } catch (err: any) {
         console.error('Error:', err);

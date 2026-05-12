@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Droplets, Loader2, CheckCircle, Wallet, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
 
@@ -11,6 +12,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function FaucetPage() {
     const { publicKey, connected, connect } = useWallet();
+    const { setVisible } = useWalletModal();
 
     const [isLoading, setIsLoading] = useState<'sol' | 'usdc' | 'idrx' | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -21,8 +23,12 @@ export default function FaucetPage() {
         setIsMounted(true);
     }, []);
 
-    const handleConnect = () => {
-        connect();
+    const handleConnect = async () => {
+        try {
+            await connect();
+        } catch (e) {
+            setVisible(true);
+        }
     };
 
     const requestFaucet = async (type: 'sol' | 'usdc' | 'idrx') => {

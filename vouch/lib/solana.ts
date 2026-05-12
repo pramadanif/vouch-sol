@@ -24,7 +24,7 @@ export function getProgram(wallet: WalletContextState, idl: any) {
     });
 
     const programId = new PublicKey(SOLANA_PROGRAM_ID);
-    return new Program(idl, provider, programId as any);
+    return new Program(idl, programId, provider) as any;
 }
 
 export function getConfigPda(): PublicKey {
@@ -60,7 +60,8 @@ export function getVaultAuthorityPda(escrow: PublicKey): PublicKey {
     return authority;
 }
 
+import { sha256 } from '@noble/hashes/sha256';
+
 export function hashDescription(text: string): Uint8Array {
-    const encoder = new TextEncoder();
-    return utils.sha256.hash(encoder.encode(text) as any);
+    return sha256(new TextEncoder().encode(text));
 }
