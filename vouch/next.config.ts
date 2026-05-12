@@ -23,10 +23,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true, // Sometimes necessary for bulky wallet adapters
   },
   webpack: (config) => {
-    config.resolve.fallback = { 
+    config.resolve.fallback = {
       ...config.resolve.fallback,
-      fs: false, 
-      os: false, 
+      fs: false,
+      os: false,
       path: false,
       crypto: false,
     };
