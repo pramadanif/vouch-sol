@@ -7,7 +7,7 @@ import { BN, web3 } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotentInstruction } from '@solana/spl-token';
 import Button from '@/components/Button';
 import FadeIn from '@/components/ui/FadeIn';
 import SellerReputation from '@/components/SellerReputation';
@@ -138,13 +138,19 @@ export default function PayLinkPage() {
             const program = getProgram({ publicKey, signTransaction } as any, VOUCH_ESCROW_IDL) as any;
             const escrowPubkey = new PublicKey(escrow.escrowId);
             const vault = getVaultPda(escrowPubkey);
-            const buyerToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), publicKey);
-            // Check if buyer has the token account initialized
-            try {
-                await connection.getTokenAccountBalance(buyerToken);
-            } catch (err) {
-                throw new Error(`You don't have a ${escrow.currency} account. Please get some tokens from the Faucet first.`);
-            }
+            const tokenMintPubkey = new PublicKey(tokenMint);
+            const buyerToken = getAssociatedTokenAddressSync(tokenMintPubkey, publicKey);
+
+            // Auto-create the buyer's ATA in the same transaction if it doesn't exist
+            // Using idempotent instruction: safe to include even if ATA already exists
+            const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+                publicKey,        // payer
+                buyerToken,       // ata address
+                publicKey,        // owner
+                tokenMintPubkey,  // mint
+                TOKEN_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID
+            );
 
             const txHash = await program.methods
                 .fundEscrow()
@@ -152,10 +158,11 @@ export default function PayLinkPage() {
                     buyer: publicKey,
                     escrowState: escrowPubkey,
                     buyerToken,
-                    tokenMint: new PublicKey(tokenMint),
+                    tokenMint: tokenMintPubkey,
                     vault,
                     tokenProgram: TOKEN_PROGRAM_ID
                 })
+                .preInstructions([createAtaIx])
                 .rpc();
 
             await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/escrow/${escrowId}/crypto-funded`, {
@@ -196,10 +203,32 @@ export default function PayLinkPage() {
                 const configAccount: any = await (program as any).account.config.fetch(config);
                 const protocolWallet = new PublicKey(configAccount.protocolWallet);
 
-                const sellerToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), new PublicKey(escrow.sellerAddress));
-                const protocolToken = getAssociatedTokenAddressSync(new PublicKey(tokenMint), protocolWallet);
-                const buyerTokenAccount = getAssociatedTokenAddressSync(new PublicKey(tokenMint), publicKey);
-                const sellerProfile = getSellerProfilePda(new PublicKey(escrow.sellerAddress));
+                const sellerAddressPubkey = new PublicKey(escrow.sellerAddress);
+                const tokenMintPubkey = new PublicKey(tokenMint);
+
+                const sellerToken = getAssociatedTokenAddressSync(tokenMintPubkey, sellerAddressPubkey);
+                const protocolToken = getAssociatedTokenAddressSync(tokenMintPubkey, protocolWallet);
+                const buyerTokenAccount = getAssociatedTokenAddressSync(tokenMintPubkey, publicKey);
+                const sellerProfile = getSellerProfilePda(sellerAddressPubkey);
+
+                // Auto-create seller and protocol ATAs if they don't exist
+                const createSellerAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+                    publicKey,           // payer (buyer)
+                    sellerToken,         // ata address
+                    sellerAddressPubkey, // owner
+                    tokenMintPubkey,     // mint
+                    TOKEN_PROGRAM_ID,
+                    ASSOCIATED_TOKEN_PROGRAM_ID
+                );
+
+                const createProtocolAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+                    publicKey,           // payer (buyer)
+                    protocolToken,       // ata address
+                    protocolWallet,      // owner
+                    tokenMintPubkey,     // mint
+                    TOKEN_PROGRAM_ID,
+                    ASSOCIATED_TOKEN_PROGRAM_ID
+                );
 
                 await program.methods
                     .confirmDelivery()
@@ -208,7 +237,7 @@ export default function PayLinkPage() {
                         config,
                         escrowState: escrowPubkey,
                         buyerToken: buyerTokenAccount,
-                        tokenMint: new PublicKey(tokenMint),
+                        tokenMint: tokenMintPubkey,
                         vault,
                         vaultAuthority,
                         sellerToken,
@@ -216,6 +245,7 @@ export default function PayLinkPage() {
                         sellerProfile,
                         tokenProgram: TOKEN_PROGRAM_ID
                     })
+                    .preInstructions([createProtocolAtaIx, createSellerAtaIx])
                     .rpc();
 
                 await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/escrow/${escrowId}/confirm-crypto`, {
