@@ -5,9 +5,7 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   },
   trailingSlash: true,
-  experimental: {
-    esmExternals: 'loose',
-  },
+  outputFileTracingRoot: path.join(__dirname, '../'),
   transpilePackages: [
     '@solana/wallet-adapter-wallets',
     '@solana/wallet-adapter-react',
