@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/logo.png" alt="Vouch Logo" width="120" />
+  <img src="vouch/public/logo.png" alt="Vouch Logo" width="120" />
 </p>
 
 <h1 align="center">Vouch</h1>
@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Built%20on-Lisk-blue" alt="Lisk" />
+  <img src="https://img.shields.io/badge/Built%20on-Solana-purple" alt="Solana" />
   <img src="https://img.shields.io/badge/Framework-Next.js%2015-black" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Smart%20Contract-Solidity-purple" alt="Solidity" />
+  <img src="https://img.shields.io/badge/Smart%20Contract-Rust%20%2F%20Anchor-orange" alt="Rust/Anchor" />
   <img src="https://img.shields.io/badge/Payment-Xendit-green" alt="Xendit" />
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT" />
 </p>
@@ -62,7 +62,7 @@ Social commerce in Southeast Asia is booming, but trust remains the biggest obst
 
 ### The Solution
 
-Vouch creates a **shareable payment link** that holds funds in a **smart contract escrow** on Lisk:
+Vouch creates a **shareable payment link** that holds funds in a **smart contract escrow** on Solana:
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌──────────────┐      ┌─────────────┐      ┌──────────────┐
@@ -79,7 +79,7 @@ Vouch creates a **shareable payment link** that holds funds in a **smart contrac
 
 **Key Innovation:**
 - Buyers pay with familiar local payment methods (QRIS, bank transfer)
-- Sellers receive funds in their own Lisk wallet
+- Sellers receive funds in their own Solana wallet
 - Smart contract ensures neither party can cheat
 - No registration, no account creation, no marketplace fees
 
@@ -99,13 +99,17 @@ Vouch creates a **shareable payment link** that holds funds in a **smart contrac
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| **Decentralized Escrow** | Smart contract on Lisk holds funds trustlessly | ✅ Live |
+| **Decentralized Escrow** | Smart contract on Solana holds funds trustlessly | ✅ Live |
 | **Fiat Payments** | QRIS, Bank Transfer, E-wallets via Xendit | ✅ Live |
 | **Crypto Payments** | Direct USDC/IDRX funding on-chain | ✅ Live |
-| **Seller Wallet** | Seller signs with their own Lisk wallet | ✅ Live |
+| **Seller Wallet** | Seller signs with their own Solana wallet | ✅ Live |
 | **Buyer Anonymity** | No wallet needed for buyers (fiat flow) | ✅ Live |
 | **Auto-Release** | Timeout protection for sellers | ✅ Live |
-| **Dashboard** | Sellers can track all escrows | ✅ Live |
+| **On-Chain Reputation** | Seller stats & star ratings stored permanently on Solana | ✅ Live |
+| **Buyer Star Rating** | Buyers rate 1-5 stars post-delivery, stored on-chain | ✅ Live |
+| **Verified Seller Badge** | Auto-granted after ≥5 completed transactions on-chain | ✅ Live |
+| **Dispute Resolution** | Protocol-mediated with on-chain outcome & reputation update | ✅ Live |
+| **Dashboard** | Sellers can track all escrows and reputation score | ✅ Live |
 | **Mobile-First** | Optimized for DM sharing | ✅ Live |
 | **Token Faucet** | Get testnet tokens for demo | ✅ Live |
 | **Demo Pages** | Interactive chat simulations | ✅ Live |
@@ -115,11 +119,271 @@ Vouch creates a **shareable payment link** that holds funds in a **smart contrac
 - **Multi-Currency Support:** PHP, IDR, THB, SGD, MYR, VND, USD via currency API
 - **Buyer Token:** Unique token for secure release authorization
 - **Webhook Integration:** Real-time payment notifications from Xendit
-- **On-Chain Verification:** All escrows verifiable on block explorer
+- **On-Chain Verification:** All escrows and reputation scores verifiable on Solana Explorer
+- **Portable Reputation:** Seller profile is a PDA — owned by the seller's wallet, not by Vouch
 - **Responsive Design:** Works seamlessly on mobile and desktop
 - **Dark Mode Ready:** Design system supports theme switching (future)
 
 ---
+
+## 🏆 On-Chain Reputation System
+
+Vouch features a fully on-chain, permissionless reputation system built directly into the Anchor smart contract. Every seller's track record is stored in a **Program Derived Account (PDA)** on Solana — permanent, censorship-resistant, and impossible to fake.
+
+### Why On-Chain Reputation Matters
+
+In social commerce, trust is the #1 barrier to transactions. Traditional platforms (Tokopedia, Shopee) solve this with centralized reviews that:
+- Can be deleted or manipulated by the platform
+- Cannot be transferred between platforms
+- Require users to stay locked within the ecosystem
+
+Vouch's reputation lives **on the blockchain**, meaning:
+- ✅ **Immutable** — no one can delete a seller's transaction history
+- ✅ **Portable** — any app can read it permissionlessly without asking Vouch
+- ✅ **Self-Sovereign** — the seller truly **owns** their reputation
+- ✅ **Auto-updating** — grows automatically with every verified sale
+
+---
+
+### `SellerProfile` Account Structure
+
+Each seller has one `SellerProfile` PDA derived from their wallet address:
+
+```rust
+// PDA Seeds: ["seller-profile", seller_pubkey]
+#[account]
+pub struct SellerProfile {
+    pub seller: Pubkey,           // The seller's wallet address (32 bytes)
+    pub total_transactions: u64,  // Number of successfully completed escrows
+    pub rating_sum: u64,          // Cumulative sum of all star ratings received
+    pub rating_count: u64,        // Total number of individual ratings submitted
+    pub disputes_won: u64,        // Number of disputes resolved in seller's favor
+    pub verified: bool,           // Auto-set true after ≥5 transactions or ratings
+    pub bump: u8,                 // PDA canonical bump for signature derivation
+}
+```
+
+**Derived Metrics (calculated client-side):**
+```
+Average Rating  = rating_sum / rating_count     (range: 1.0 – 5.0 ★)
+Verified Status = total_transactions >= 5
+Reputation Score = f(total_transactions, avg_rating, disputes_won)
+```
+
+---
+
+### Reputation Instructions (Smart Contract)
+
+#### 1. `init_seller_profile` — One-time Setup
+
+Must be called once by the seller before creating their first escrow. Creates the PDA account on-chain.
+
+```typescript
+const [sellerProfilePDA] = PublicKey.findProgramAddressSync(
+  [Buffer.from("seller-profile"), sellerWallet.publicKey.toBuffer()],
+  PROGRAM_ID
+);
+
+await program.methods
+  .initSellerProfile()
+  .accounts({
+    seller: sellerWallet.publicKey,
+    sellerProfile: sellerProfilePDA,
+    systemProgram: SystemProgram.programId,
+  })
+  .signers([sellerWallet])
+  .rpc();
+```
+
+---
+
+#### 2. `update_seller_stats` — Auto-called On Success
+
+This internal helper is called automatically by the contract on every successful outcome. It is **not** callable directly:
+
+```rust
+fn update_seller_stats(profile: &mut Account<SellerProfile>) -> Result<()> {
+    // Increment total completed transactions atomically
+    profile.total_transactions = profile.total_transactions.saturating_add(1);
+    // Auto-grant verified badge once threshold is met
+    if profile.rating_count >= 5 {
+        profile.verified = true;
+    }
+    Ok(())
+}
+```
+
+**Triggered automatically in these instructions:**
+
+| Instruction | Trigger Condition |
+|-------------|-------------------|
+| `confirm_delivery` | Buyer explicitly confirms receipt ✅ |
+| `release_funds` | Auto-release after timeout expires ✅ |
+| `resolve_dispute` (seller wins) | Protocol resolves in seller's favor ✅ |
+
+---
+
+#### 3. `add_rating` — Buyer Submits Star Rating
+
+After a successful delivery, buyers can submit a 1–5 star rating. Stored permanently on-chain.
+
+```typescript
+await program.methods
+  .addRating(5)  // integer 1 through 5
+  .accounts({
+    buyer: buyerWallet.publicKey,
+    escrowState: escrowPDA,
+    sellerProfile: sellerProfilePDA,
+  })
+  .signers([buyerWallet])
+  .rpc();
+```
+
+**On-chain validation enforced by the contract:**
+- Rating must be between `1` and `5` (inclusive) — `InvalidRating` error if not
+- Caller must be the verified buyer of that specific escrow — `Unauthorized` if not
+- Escrow must be in `Released` or `Resolved` status — `InvalidStatus` if not
+- Auto-grants `verified = true` if `rating_count >= 5` after this rating
+
+---
+
+#### 4. `resolve_dispute` — Dispute Affects Reputation
+
+When a dispute is resolved in the seller's favor, `disputes_won` is incremented alongside `total_transactions`:
+
+```rust
+match outcome {
+    DisputeOutcome::ReleaseToSeller => {
+        // Seller wins the dispute: record it in reputation
+        ctx.accounts.seller_profile.disputes_won =
+            ctx.accounts.seller_profile.disputes_won.saturating_add(1);
+        update_seller_stats(&mut ctx.accounts.seller_profile)?;
+    }
+    DisputeOutcome::ReleaseToBuyer => {
+        // Buyer wins: refund issued, no reputation change for seller
+        release_to_buyer(...)?
+    }
+}
+```
+
+---
+
+### Verified Seller Badge Logic
+
+The `verified` flag is set permanently once either condition is met:
+
+```rust
+// Condition A: enough total transactions
+if profile.total_transactions >= 5 {
+    profile.verified = true;
+}
+
+// Condition B: enough individual ratings from buyers
+if profile.rating_count >= 5 {
+    profile.verified = true;
+}
+```
+
+Once verified, the badge **cannot be revoked** — it is a permanent milestone.
+
+---
+
+### On-Chain Events Emitted
+
+All reputation state changes emit on-chain events for indexers:
+
+```rust
+#[event]
+pub struct SellerProfileInitialized {
+    pub seller: Pubkey,
+}
+
+#[event]
+pub struct RatingAdded {
+    pub seller: Pubkey,
+    pub rating: u8,  // 1 to 5
+}
+```
+
+---
+
+### Reading Reputation from Frontend
+
+Anyone can fetch a seller's full reputation **directly from Solana** — no Vouch API call needed:
+
+```typescript
+import { PublicKey, Connection } from "@solana/web3.js";
+import { Program } from "@coral-xyz/anchor";
+import BN from "bn.js";
+
+// Derive the PDA for any seller's wallet
+const [sellerProfilePDA] = PublicKey.findProgramAddressSync(
+  [Buffer.from("seller-profile"), sellerPublicKey.toBuffer()],
+  new PublicKey("5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W") // Program ID
+);
+
+// Fetch the on-chain account (readable by anyone)
+const profile = await program.account.sellerProfile.fetch(sellerProfilePDA);
+
+// Derive human-readable stats
+const ratingCount = profile.ratingCount.toNumber();
+const avgRating = ratingCount > 0
+  ? (profile.ratingSum.toNumber() / ratingCount).toFixed(1)
+  : "No ratings yet";
+
+console.log({
+  seller: profile.seller.toBase58(),
+  totalTransactions: profile.totalTransactions.toNumber(), // e.g. 27
+  averageRating: avgRating,                                // e.g. "4.8"
+  disputesWon: profile.disputesWon.toNumber(),             // e.g. 1
+  isVerified: profile.verified,                            // true
+});
+```
+
+**Example Response:**
+```json
+{
+  "seller": "AaBbCcDdEe...XxYyZz",
+  "totalTransactions": 27,
+  "averageRating": "4.8",
+  "disputesWon": 1,
+  "isVerified": true
+}
+```
+
+---
+
+### Reputation Lifecycle
+
+```
+Seller → init_seller_profile (one-time, on-chain PDA created)
+         │
+         ▼
+Seller creates escrow → Buyer pays → Seller marks shipped
+         │
+         ▼
+    [Path A: Normal Delivery]
+    Buyer calls confirm_delivery()
+         │
+         └──► update_seller_stats()  →  total_transactions += 1
+         └──► Buyer (optionally) calls add_rating(1-5)
+                   rating_sum += stars, rating_count += 1
+                   verified = true  (if count ≥ 5)
+
+    [Path B: Auto-Release after Timeout]
+    Protocol calls release_funds()
+         └──► update_seller_stats()  →  total_transactions += 1
+
+    [Path C: Dispute Filed & Won by Seller]
+    Protocol calls resolve_dispute(ReleaseToSeller)
+         └──► disputes_won += 1
+         └──► update_seller_stats()  →  total_transactions += 1
+
+    [Path D: Dispute Lost by Seller]
+    Protocol calls resolve_dispute(ReleaseToBuyer)
+         └──► Refund to buyer, no reputation change
+```
+
 
 ## 🏗️ Architecture
 
@@ -151,10 +415,10 @@ graph TB
         HotWallet["🔐 Protocol Wallet<br/>Funds Fiat Escrows"]
     end
 
-    subgraph Blockchain["⛓️ Lisk Sepolia Testnet"]
-        VouchEscrow["VouchEscrow.sol<br/>Main Logic"]
-        MockUSDC["MockUSDC.sol<br/>Test Stablecoin"]
-        MockIDRX["MockIDRX.sol<br/>IDR Stablecoin"]
+    subgraph Blockchain["⛓️ Solana Devnet"]
+        VouchEscrow["lib.rs / Anchor<br/>Main Logic"]
+        MockUSDC["SPL Token<br/>Test Stablecoin"]
+        MockIDRX["SPL Token<br/>IDR Stablecoin"]
     end
 
     subgraph External["🌐 External Services"]
@@ -212,7 +476,7 @@ graph TB
                             │ ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    DATA PERSISTENCE LAYER                     │
-│  PostgreSQL (Metadata) | Lisk Blockchain (Escrow State)     │
+│  PostgreSQL (Metadata) | Solana Blockchain (Escrow State)   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -220,24 +484,24 @@ graph TB
 
 ## 📜 Smart Contracts
 
-### Deployed Addresses (Lisk Sepolia)
+### Deployed Addresses (Solana Devnet)
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| **VouchEscrow** | `0xb015d8Eb15B5E82E10aCF1606c60cFD64C4c7cB2` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xb015d8Eb15B5E82E10aCF1606c60cFD64C4c7cB2) |
-| **MockUSDC** | `0xB7c78ceCB25a1c40b3fa3382bAf3F34c9b5bdD66` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xB7c78ceCB25a1c40b3fa3382bAf3F34c9b5bdD66) |
-| **MockIDRX** | `0xDfef62cf7516508B865440E5819e5435e69adceb` | [View on Explorer](https://sepolia-blockscout.lisk.com/address/0xDfef62cf7516508B865440E5819e5435e69adceb) |
+| **VouchProgram** | `5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W` | [View on Explorer](https://explorer.solana.com/address/5SGRD6bVjaD75nhMtnDqcjpVwqcqqsc6Z6sAGBwP3Q6W?cluster=devnet) |
+| **IDRX Mint** | `hBNyV8aQutBWyXdA42MXiAgwyQBom6GC8d9sBgkLKzG` | [View on Explorer](https://explorer.solana.com/address/hBNyV8aQutBWyXdA42MXiAgwyQBom6GC8d9sBgkLKzG?cluster=devnet) |
+| **USDC Mint** | `GRyeQzyBoYBNqUp86wWyAWxb3ACtDGQw6QjVgimwa3GP` | [View on Explorer](https://explorer.solana.com/address/GRyeQzyBoYBNqUp86wWyAWxb3ACtDGQw6QjVgimwa3GP?cluster=devnet) |
 
 ### Network Configuration
 
 | Property | Value |
 |----------|-------|
-| **Network Name** | Lisk Sepolia Testnet |
-| **Chain ID** | `4202` |
-| **RPC URL** | `https://rpc.sepolia-api.lisk.com` |
-| **Currency Symbol** | ETH |
-| **Block Explorer** | `https://sepolia-blockscout.lisk.com` |
-| **Faucet** | `https://sepolia-faucet.lisk.com` |
+| **Network Name** | Solana Devnet |
+| **Chain ID** | `103` |
+| **RPC URL** | `https://api.devnet.solana.com` |
+| **Currency Symbol** | SOL |
+| **Block Explorer** | `https://explorer.solana.com/?cluster=devnet` |
+| **Faucet** | `https://faucet.solana.com` |
 
 ### VouchEscrow.sol - State Machine
 

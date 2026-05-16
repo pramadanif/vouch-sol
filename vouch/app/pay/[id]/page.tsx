@@ -338,35 +338,33 @@ export default function PayLinkPage() {
 
                         {status === 'pending' && (
                             <div className="space-y-6">
-                                <div className="flex justify-center gap-3">
-                                    <Button 
-                                        variant={paymentMethod === 'fiat' ? 'primary' : 'outline'} 
-                                        size="md" 
-                                        onClick={() => setPaymentMethod('fiat')}
-                                        className={paymentMethod === 'fiat' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
-                                    >
-                                        Pay with QRIS / Fiat
-                                    </Button>
-                                    <Button 
-                                        variant={paymentMethod === 'crypto' ? 'primary' : 'outline'} 
-                                        size="md" 
-                                        onClick={() => setPaymentMethod('crypto')}
-                                        className={paymentMethod === 'crypto' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
-                                    >
-                                        Pay with Crypto
-                                    </Button>
-                                </div>
+                                {/* Only show payment method toggle for IDR escrows */}
+                                {escrow?.fiatCurrency === 'IDR' && (
+                                    <div className="flex justify-center gap-3">
+                                        <Button 
+                                            variant={paymentMethod === 'fiat' ? 'primary' : 'outline'} 
+                                            size="md" 
+                                            onClick={() => setPaymentMethod('fiat')}
+                                            className={paymentMethod === 'fiat' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
+                                        >
+                                            Pay with QRIS / Fiat
+                                        </Button>
+                                        <Button 
+                                            variant={paymentMethod === 'crypto' ? 'primary' : 'outline'} 
+                                            size="md" 
+                                            onClick={() => setPaymentMethod('crypto')}
+                                            className={paymentMethod === 'crypto' ? 'shadow-md shadow-brand-action/20 w-full sm:w-auto' : 'w-full sm:w-auto bg-white'}
+                                        >
+                                            Pay with Crypto
+                                        </Button>
+                                    </div>
+                                )}
 
                                 <div className="pt-4 border-t border-brand-border/50">
-                                    {paymentMethod === 'fiat' ? (
+                                    {paymentMethod === 'fiat' && escrow?.fiatCurrency === 'IDR' ? (
                                         <div className="space-y-4">
                                             <Button variant="primary" size="lg" onClick={handlePayFiat} className="w-full shadow-lg shadow-brand-action/20 py-4 text-base">
                                                 Continue to Payment
-                                            </Button>
-                                            <Button variant="outline" size="lg" onClick={handleSimulatePayment} disabled={isSimulating} className="w-full bg-white text-brand-secondary py-4 text-base">
-                                                {isSimulating ? (
-                                                    <span className="flex items-center justify-center gap-2"><Loader2 className="animate-spin" size={18} /> Simulating...</span>
-                                                ) : 'Simulate Payment (Devnet)'}
                                             </Button>
                                         </div>
                                     ) : (
